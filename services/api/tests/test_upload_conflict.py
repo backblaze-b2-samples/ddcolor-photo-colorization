@@ -10,18 +10,18 @@ from app.service.upload import _validate_declared
 
 
 def test_key_uses_original_filename():
-    key = _validate_declared("report.txt", "text/plain", 5)
-    assert key == "uploads/report.txt"
+    key = _validate_declared("scan.jpg", "image/jpeg", 5)
+    assert key == "colorization/grayscale/scan.jpg"
 
 
 def test_duplicate_filename_yields_same_key():
     # No dedup: two uploads of the same name resolve to the same key, and B2
     # versioning keeps both. Minting is deterministic, so the keys match.
-    first = _validate_declared("report.txt", "text/plain", 5)
-    second = _validate_declared("report.txt", "text/plain", 9)
-    assert first == second == "uploads/report.txt"
+    first = _validate_declared("scan.jpg", "image/jpeg", 5)
+    second = _validate_declared("scan.jpg", "image/jpeg", 9)
+    assert first == second == "colorization/grayscale/scan.jpg"
 
 
 def test_key_is_sanitised():
-    key = _validate_declared("../../etc/my report.txt", "text/plain", 5)
-    assert key == "uploads/my_report.txt"
+    key = _validate_declared("../../etc/my scan.jpg", "image/jpeg", 5)
+    assert key == "colorization/grayscale/my_scan.jpg"

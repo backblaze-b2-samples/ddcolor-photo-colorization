@@ -1,6 +1,530 @@
 {
   "components": {
     "schemas": {
+      "Batch": {
+        "description": "A colorization run: configuration, status and byte counts.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "derived_bytes": {
+            "description": "Bytes this batch wrote: colorized outputs, comparisons and its manifest.",
+            "title": "Derived Bytes",
+            "type": "integer"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "done_count": {
+            "title": "Done Count",
+            "type": "integer"
+          },
+          "failed_count": {
+            "title": "Failed Count",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "input_size": {
+            "$ref": "#/components/schemas/InputSize"
+          },
+          "make_comparisons": {
+            "title": "Make Comparisons",
+            "type": "boolean"
+          },
+          "manifest_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Key"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "original_bytes": {
+            "description": "Bytes of the grayscale originals in this batch.",
+            "title": "Original Bytes",
+            "type": "integer"
+          },
+          "output_format": {
+            "$ref": "#/components/schemas/OutputFormat"
+          },
+          "photo_count": {
+            "title": "Photo Count",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BatchStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "name",
+          "description",
+          "model_id",
+          "input_size",
+          "output_format",
+          "make_comparisons",
+          "status",
+          "photo_count",
+          "done_count",
+          "failed_count",
+          "original_bytes",
+          "derived_bytes",
+          "manifest_key",
+          "created_at",
+          "updated_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "Batch",
+        "type": "object"
+      },
+      "BatchDetail": {
+        "description": "A batch plus every item, for the detail page.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "derived_bytes": {
+            "description": "Bytes this batch wrote: colorized outputs, comparisons and its manifest.",
+            "title": "Derived Bytes",
+            "type": "integer"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "done_count": {
+            "title": "Done Count",
+            "type": "integer"
+          },
+          "failed_count": {
+            "title": "Failed Count",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "input_size": {
+            "$ref": "#/components/schemas/InputSize"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BatchItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "make_comparisons": {
+            "title": "Make Comparisons",
+            "type": "boolean"
+          },
+          "manifest_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Key"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "original_bytes": {
+            "description": "Bytes of the grayscale originals in this batch.",
+            "title": "Original Bytes",
+            "type": "integer"
+          },
+          "output_format": {
+            "$ref": "#/components/schemas/OutputFormat"
+          },
+          "photo_count": {
+            "title": "Photo Count",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BatchStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "name",
+          "description",
+          "model_id",
+          "input_size",
+          "output_format",
+          "make_comparisons",
+          "status",
+          "photo_count",
+          "done_count",
+          "failed_count",
+          "original_bytes",
+          "derived_bytes",
+          "manifest_key",
+          "created_at",
+          "updated_at",
+          "started_at",
+          "finished_at",
+          "model_version",
+          "items"
+        ],
+        "title": "BatchDetail",
+        "type": "object"
+      },
+      "BatchItem": {
+        "description": "One photo in a batch, with short-lived presigned URLs for viewing.",
+        "properties": {
+          "colorized_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colorized Key"
+          },
+          "colorized_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colorized Url"
+          },
+          "comparison_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Key"
+          },
+          "comparison_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Url"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "original_key": {
+            "title": "Original Key",
+            "type": "string"
+          },
+          "original_url": {
+            "description": "Inline presigned GET for the grayscale original.",
+            "title": "Original Url",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItemStatus"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "required": [
+          "original_key",
+          "colorized_key",
+          "comparison_key",
+          "status",
+          "error",
+          "width",
+          "height",
+          "duration_ms",
+          "original_url",
+          "colorized_url",
+          "comparison_url"
+        ],
+        "title": "BatchItem",
+        "type": "object"
+      },
+      "BatchStatus": {
+        "enum": [
+          "draft",
+          "queued",
+          "running",
+          "done",
+          "partial",
+          "failed",
+          "interrupted"
+        ],
+        "title": "BatchStatus",
+        "type": "string"
+      },
+      "ColorizationStats": {
+        "description": "Dashboard aggregates, headlined by the write-amplification ratio.",
+        "properties": {
+          "amplification_ratio": {
+            "description": "(grayscale_bytes + derived_bytes) / grayscale_bytes: stored bytes per ingested byte.",
+            "title": "Amplification Ratio",
+            "type": "number"
+          },
+          "batches_total": {
+            "title": "Batches Total",
+            "type": "integer"
+          },
+          "derived_bytes": {
+            "description": "Colorized outputs + comparison images + manifest CSVs under the app prefix.",
+            "title": "Derived Bytes",
+            "type": "integer"
+          },
+          "grayscale_bytes": {
+            "title": "Grayscale Bytes",
+            "type": "integer"
+          },
+          "photos_colorized": {
+            "title": "Photos Colorized",
+            "type": "integer"
+          },
+          "photos_ingested": {
+            "title": "Photos Ingested",
+            "type": "integer"
+          },
+          "recent_batches": {
+            "items": {
+              "$ref": "#/components/schemas/Batch"
+            },
+            "title": "Recent Batches",
+            "type": "array"
+          }
+        },
+        "required": [
+          "photos_ingested",
+          "photos_colorized",
+          "batches_total",
+          "grayscale_bytes",
+          "derived_bytes",
+          "amplification_ratio",
+          "recent_batches"
+        ],
+        "title": "ColorizationStats",
+        "type": "object"
+      },
+      "CreateBatchRequest": {
+        "description": "Create a batch. Defaults mirror the create form's suggested values.",
+        "properties": {
+          "all_unprocessed": {
+            "default": false,
+            "description": "Use every original that no batch has colorized yet.",
+            "title": "All Unprocessed",
+            "type": "boolean"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "input_size": {
+            "$ref": "#/components/schemas/InputSize",
+            "default": 512
+          },
+          "make_comparisons": {
+            "default": true,
+            "title": "Make Comparisons",
+            "type": "boolean"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId",
+            "default": "ddcolor_paper_tiny"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "output_format": {
+            "$ref": "#/components/schemas/OutputFormat",
+            "default": "jpeg"
+          },
+          "run_now": {
+            "default": true,
+            "title": "Run Now",
+            "type": "boolean"
+          },
+          "source_keys": {
+            "description": "Original keys under the grayscale/ prefix. Ignored when all_unprocessed is true.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateBatchRequest",
+        "type": "object"
+      },
       "DailyUploadCount": {
         "description": "One day's upload count, for the dashboard activity chart.",
         "properties": {
@@ -18,6 +542,25 @@
           "uploads"
         ],
         "title": "DailyUploadCount",
+        "type": "object"
+      },
+      "DeleteBatchResponse": {
+        "description": "A deleted batch. Grayscale originals are never deleted.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "deleted_objects": {
+            "title": "Deleted Objects",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "deleted_objects"
+        ],
+        "title": "DeleteBatchResponse",
         "type": "object"
       },
       "DeleteFileResponse": {
@@ -330,6 +873,18 @@
             ],
             "description": "Public object URL when the bucket is public, else null.",
             "title": "Url"
+          },
+          "was_color": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Image ingest check: true when the photo is already in colour (it is desaturated before inference), false for grayscale, null if unchecked.",
+            "title": "Was Color"
           }
         },
         "required": [
@@ -340,6 +895,7 @@
           "content_type",
           "uploaded_at",
           "url",
+          "was_color",
           "metadata"
         ],
         "title": "FileUploadResponse",
@@ -392,6 +948,285 @@
           "b2_connected"
         ],
         "title": "HealthStatus",
+        "type": "object"
+      },
+      "InputSize": {
+        "description": "Square resolution the model predicts colour at (output keeps the original size).",
+        "enum": [
+          256,
+          512
+        ],
+        "title": "InputSize",
+        "type": "integer"
+      },
+      "ItemStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "ItemStatus",
+        "type": "string"
+      },
+      "ModelId": {
+        "description": "DDColor checkpoints published on the Hugging Face Hub (`piddnad/<id>`).",
+        "enum": [
+          "ddcolor_modelscope",
+          "ddcolor_paper",
+          "ddcolor_artistic",
+          "ddcolor_paper_tiny"
+        ],
+        "title": "ModelId",
+        "type": "string"
+      },
+      "OutputFormat": {
+        "enum": [
+          "jpeg",
+          "png",
+          "webp"
+        ],
+        "title": "OutputFormat",
+        "type": "string"
+      },
+      "Photo": {
+        "description": "One ingested original and a pointer to its latest colorized version.",
+        "properties": {
+          "colorized_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inline presigned GET for the latest colorized version.",
+            "title": "Colorized Url"
+          },
+          "colorized_versions": {
+            "title": "Colorized Versions",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "last_modified": {
+            "format": "date-time",
+            "title": "Last Modified",
+            "type": "string"
+          },
+          "original_url": {
+            "description": "Inline presigned GET for the original.",
+            "title": "Original Url",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "was_color": {
+            "description": "True when the ingest check found a colour image; it is desaturated before inference.",
+            "title": "Was Color",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "filename",
+          "size",
+          "last_modified",
+          "was_color",
+          "colorized_versions",
+          "original_url",
+          "colorized_url"
+        ],
+        "title": "Photo",
+        "type": "object"
+      },
+      "PhotoDetail": {
+        "properties": {
+          "colorized_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inline presigned GET for the latest colorized version.",
+            "title": "Colorized Url"
+          },
+          "colorized_versions": {
+            "title": "Colorized Versions",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "last_modified": {
+            "format": "date-time",
+            "title": "Last Modified",
+            "type": "string"
+          },
+          "original_url": {
+            "description": "Inline presigned GET for the original.",
+            "title": "Original Url",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/PhotoVersion"
+            },
+            "title": "Versions",
+            "type": "array"
+          },
+          "was_color": {
+            "description": "True when the ingest check found a colour image; it is desaturated before inference.",
+            "title": "Was Color",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "filename",
+          "size",
+          "last_modified",
+          "was_color",
+          "colorized_versions",
+          "original_url",
+          "colorized_url",
+          "versions"
+        ],
+        "title": "PhotoDetail",
+        "type": "object"
+      },
+      "PhotoPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Photo"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "PhotoPage",
+        "type": "object"
+      },
+      "PhotoVersion": {
+        "description": "One colorized version of an original, produced by one batch.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "batch_name": {
+            "title": "Batch Name",
+            "type": "string"
+          },
+          "colorized_key": {
+            "title": "Colorized Key",
+            "type": "string"
+          },
+          "colorized_url": {
+            "title": "Colorized Url",
+            "type": "string"
+          },
+          "comparison_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Key"
+          },
+          "comparison_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Url"
+          },
+          "download_url": {
+            "description": "Attachment presigned GET for the colorized file.",
+            "title": "Download Url",
+            "type": "string"
+          },
+          "input_size": {
+            "$ref": "#/components/schemas/InputSize"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "batch_name",
+          "model_id",
+          "input_size",
+          "colorized_key",
+          "comparison_key",
+          "size",
+          "processed_at",
+          "colorized_url",
+          "comparison_url",
+          "download_url"
+        ],
+        "title": "PhotoVersion",
         "type": "object"
       },
       "PresignUploadRequest": {
@@ -459,6 +1294,38 @@
           "expires_in"
         ],
         "title": "PresignUploadResponse",
+        "type": "object"
+      },
+      "UpdateBatchRequest": {
+        "description": "Only the descriptive fields are editable; the configuration is immutable.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "UpdateBatchRequest",
         "type": "object"
       },
       "UploadStats": {
@@ -552,12 +1419,337 @@
     }
   },
   "info": {
-    "description": "Local API for the Vibe Coding Starter Kit template, providing file upload and management backed by Backblaze B2. This contract documents the template's local API, not a hosted public endpoint.",
-    "title": "Vibe Coding Starter Kit API",
+    "description": "Local API for DDColor Photo Colorization: bulk-ingest black-and-white scans to Backblaze B2, colorize them in batches with DDColor running locally, and serve originals, colorized outputs, comparisons and per-run manifests from B2. This contract documents the sample's local API, not a hosted public endpoint.",
+    "title": "DDColor Photo Colorization API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/batches": {
+      "get": {
+        "operationId": "list_batches_endpoint_batches_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Batch"
+                  },
+                  "title": "Response List Batches Endpoint Batches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Batches Endpoint",
+        "tags": [
+          "batches"
+        ]
+      },
+      "post": {
+        "operationId": "create_batch_endpoint_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Batch Endpoint",
+        "tags": [
+          "batches"
+        ]
+      }
+    },
+    "/batches/stats": {
+      "get": {
+        "operationId": "batch_stats_endpoint_batches_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColorizationStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Batch Stats Endpoint",
+        "tags": [
+          "batches"
+        ]
+      }
+    },
+    "/batches/{batch_id}": {
+      "delete": {
+        "description": "Delete the batch's colorized outputs, comparisons, manifest and record.\n\nGrayscale originals are never deleted.",
+        "operationId": "delete_batch_endpoint_batches__batch_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Batch Endpoint",
+        "tags": [
+          "batches"
+        ]
+      },
+      "get": {
+        "operationId": "get_batch_endpoint_batches__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Batch Endpoint",
+        "tags": [
+          "batches"
+        ]
+      },
+      "patch": {
+        "operationId": "update_batch_endpoint_batches__batch_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Batch Endpoint",
+        "tags": [
+          "batches"
+        ]
+      }
+    },
+    "/batches/{batch_id}/manifest/download": {
+      "get": {
+        "operationId": "manifest_download_endpoint_batches__batch_id__manifest_download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUrlResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Manifest Download Endpoint",
+        "tags": [
+          "batches"
+        ]
+      }
+    },
+    "/batches/{batch_id}/run": {
+      "post": {
+        "description": "Queue a batch for colorization (503 with the install command if DDColor is missing).",
+        "operationId": "run_batch_endpoint_batches__batch_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Batch Endpoint",
+        "tags": [
+          "batches"
+        ]
+      }
+    },
     "/files": {
       "get": {
         "operationId": "list_files_endpoint_files_get",
@@ -1099,6 +2291,107 @@
         "summary": "Metrics",
         "tags": [
           "metrics"
+        ]
+      }
+    },
+    "/photos": {
+      "get": {
+        "operationId": "list_photos_endpoint_photos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 48,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Photos Endpoint",
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/photos-by-key/detail": {
+      "get": {
+        "operationId": "photo_detail_endpoint_photos_by_key_detail_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Photo Detail Endpoint",
+        "tags": [
+          "photos"
         ]
       }
     },

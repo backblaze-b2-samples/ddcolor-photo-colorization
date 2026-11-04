@@ -1,17 +1,18 @@
-<!-- last_verified: 2026-07-30 -->
+<!-- last_verified: 2026-11-04 -->
 # Security
 
-Security principles and implementation for the vibe-coding-starter-kit.
+Security principles and implementation for DDColor Photo Colorization.
 
 ## Trust Boundaries
 
-- **Frontend -> API**: CORS-restricted to configured origins, scoped to `GET/POST/DELETE/OPTIONS`. `allow_credentials` is `False` (no cookie/session auth today); enable it only alongside real auth and a tightened origin allowlist.
-- **API -> B2**: Authenticated via `B2_APPLICATION_KEY_ID` + `B2_APPLICATION_KEY`, signature v4
-- **Client -> B2**: Presigned URLs for download (10-min expiry, `Content-Disposition: attachment`) and for direct upload (short-lived PUT with the size and content-type signed in, so B2 rejects a mismatched body)
+- **Frontend -> API**: CORS-restricted to configured origins, scoped to `GET/POST/PATCH/DELETE/OPTIONS`. `allow_credentials` is `False` (no cookie/session auth today); enable it only alongside real auth and a tightened origin allowlist.
+- **API -> B2**: Authenticated via `B2_APPLICATION_KEY_ID` + `B2_APPLICATION_KEY`, signature v4, custom user agent `b2ai-ddcolor-photo-colorization` on every S3 client
+- **API -> Hugging Face Hub**: anonymous HTTPS download of the public `piddnad/ddcolor_*` checkpoints on first use; no token is configured or needed. Weights load through `huggingface_hub`'s `PyTorchModelHubMixin` from pinned, public repositories
+- **Client -> B2**: Presigned URLs for ingest (15-min PUT with the size and content-type signed in, so B2 rejects a mismatched body), for gallery viewing (1-hour GET, `inline`; `PRESIGN_VIEW_EXPIRY_SECONDS`) and for downloads and manifests (10-min GET, `attachment`)
 
 ## Authentication & Multi-Tenancy
 
-- **No auth by design.** The file API (`/files`, `/files-by-key`, `/upload/presign`, `/upload/verify`) is unauthenticated and bucket-wide — any client can list, download, delete, and (via presign) upload objects. Acceptable for a single-tenant demo; the rate limiter guards the open endpoints.
+- **No auth by design.** The whole API (`/batches`, `/photos`, `/files`, `/files-by-key`, `/upload/*`) is unauthenticated: any client that reaches it can ingest, colorize (spending the host's CPU/GPU), list, download and delete. Acceptable for a single-tenant tool on a trusted machine or private deployment; the rate limiter guards the open endpoints, and only one batch runs at a time.
 - **Adding auth to a clone does not close this automatically.** A login screen alone leaves an open, cross-user file API. You must both (1) require auth on every file route and (2) scope listings and reads to the caller's own prefixes — skipping either lets one signed-in user read and delete another's files. See the co-located notes in `runtime/files.py` and `service/files.py`.
 
 ## Upload Validation
@@ -19,11 +20,12 @@ Security principles and implementation for the vibe-coding-starter-kit.
 Uploads go directly from the browser to B2, so the API validates at two points:
 `/upload/presign` (before any bytes) and `/upload/verify` (after the PUT).
 
-- Filename sanitization: path traversal, null bytes, unsafe chars stripped; the API mints the object key (`uploads/{sanitised}`), so the client never chooses it
+- Filename sanitization: path traversal, null bytes, unsafe chars stripped; the API mints the object key (`colorization/grayscale/{sanitised}`), so the client never chooses it
 - MIME/extension consistency check against the allowlist (at presign)
 - Size enforcement: the declared size is signed into the presigned PUT as `Content-Length`, so B2 rejects a body of any other size with `403`; the API refuses to presign a size above the 100MB default
-- Content-type allowlist (images, PDFs, text, archives, audio/video), also signed into the PUT. **SVG is excluded** — it can embed `<script>` that executes when served from a public bucket URL (stored XSS). Re-add only with server-side sanitization.
-- **Magic-byte signature check** (at verify): a `Range` GET fetches the leading bytes and confirms they match the declared type, so a script payload can't masquerade as `image/png`; a mismatch deletes the object. Text-like types (plain/CSV/JSON) have no signature and skip this check.
+- Content-type allowlist: raster images only (JPEG, PNG, TIFF, WebP, BMP), also signed into the PUT. **SVG is excluded**: it can embed `<script>` that executes when served from a public bucket URL (stored XSS).
+- **Magic-byte signature check** (at verify): a `Range` GET fetches the leading bytes and confirms they match the declared type, so a script payload can't masquerade as `image/png`; a mismatch deletes the object. Every allowed type has a signature.
+- **Decode limits**: the pipeline refuses to decode more than `MAX_PHOTO_PIXELS` (60 million by default), failing that photo's item instead of exhausting memory; Pillow's own decompression-bomb guard stays on.
 - Empty file rejection (at presign)
 - The `/upload/presign` endpoint hands out short-lived, single-key, size- and type-bound B2 write URLs. Like the rest of the API it is unauthenticated, and it is guarded by the write rate limiter.
 
@@ -36,12 +38,20 @@ Uploads go directly from the browser to B2, so the API validates at two points:
 
 - Empty keys rejected
 - Path traversal patterns rejected (`../`, `%2e%2e`, backslashes, null bytes)
-- Optional prefix confinement: set `ALLOWED_KEY_PREFIX` (e.g. `uploads/`) to restrict key-addressed reads/deletes when the bucket is shared with other workloads. Empty by default — the by-key routes otherwise accept arbitrary folder and reserved-word keys by design.
+- Prefix confinement **on by default**: `ALLOWED_KEY_PREFIX` defaults to `colorization/`, so the Bucket Explorer's by-key preview, download, detail and delete cannot reach other workloads' objects in a shared bucket (they are still listed). Set it empty to allow every key.
+- Batch ids must match `b-YYYYMMDD-HHMMSS-<hex>` before any key is built from them; Photo Library keys must be direct children of `colorization/grayscale/`.
+
+## Originals Are Never Overwritten
+
+- The pipeline only reads `colorization/grayscale/`; every write goes to `colorized/<batch_id>/`, `comparisons/<batch_id>/`, `manifests/`, `batches/` or `flags/`.
+- Batch delete lists and removes only that batch's own prefixes, manifest and record. It never touches originals.
+- Re-uploading a file with the same name replaces the current version at that key; B2 keeps the previous version, so an accidental overwrite is recoverable from the bucket's version history.
 
 ## Download Safety
 
-- Presigned URLs force `Content-Disposition: attachment`
-- Prevents inline rendering of user-uploaded content (XSS mitigation)
+- Download and manifest URLs force `Content-Disposition: attachment`.
+- Gallery and Photo Library URLs are `inline` so `<img>` can render them. That is safe because only magic-byte-checked raster image types can be ingested, and every derived object is written by the API as JPEG, PNG, WebP or CSV.
+- A presigned URL is a bearer credential until it expires; a CMS job given one can read that single object for up to the view TTL. Shorten `PRESIGN_VIEW_EXPIRY_SECONDS` if that window is too long for your archive.
 
 ## Response Hardening
 
@@ -75,9 +85,8 @@ Uploads go directly from the browser to B2, so the API validates at two points:
 
 ## Deployment Configuration
 
-The [Railway](../infra/railway/README.md) and
-[Vercel](../infra/vercel/README.md) delivery contracts are the canonical
-locations for production variable classification and environment access rules.
+The [Railway](../infra/railway/README.md) delivery contract is the canonical
+location for production variable classification and environment access rules.
 In particular, `B2_APPLICATION_KEY_ID` and `B2_APPLICATION_KEY` are secrets; the web
 service's `NEXT_PUBLIC_API_URL` is intentionally public build-time
 configuration and must never contain a credential. Keep production variables,

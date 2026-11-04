@@ -57,7 +57,7 @@ def _client():
         region_name=settings.b2_region,
         aws_access_key_id=settings.b2_application_key_id,
         aws_secret_access_key=settings.b2_application_key,
-        config=Config(signature_version="s3v4", user_agent_extra="b2ai-oss-start"),
+        config=Config(signature_version="s3v4", user_agent_extra="b2ai-ddcolor-photo-colorization"),
     )
 
 

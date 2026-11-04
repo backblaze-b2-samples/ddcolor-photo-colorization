@@ -1,11 +1,11 @@
-<!-- last_verified: 2026-07-28 -->
-# Feature: File Browser
+<!-- last_verified: 2026-11-04 -->
+# Feature: Bucket Explorer
 
 ## Purpose
-List, preview, download, and delete files stored in Backblaze B2.
+List, preview, download, and delete any object in the Backblaze B2 bucket: the full-bucket view that sits beside the app-scoped [Photo Library](photo-library.md). It also hosts the generic per-object detail endpoint (checksums, image dimensions, EXIF) that the kit's metadata extraction provides.
 
 ## Used By
-- UI: `/files` page, file browser component
+- UI: `/files` page (**Bucket Explorer** in the sidebar), file browser component, the ⌘K palette's file search
 - API: `GET /files`, `GET /files-by-key/metadata?key=...`, `GET /files-by-key/detail?key=...`, `GET /files-by-key/download?key=...`, `GET /files-by-key/preview?key=...`, `DELETE /files-by-key?key=...`
 - Legacy API: `GET /files/{key}`, `GET /files/{key}/download`, `GET /files/{key}/preview`, `DELETE /files/{key}`
 
@@ -16,7 +16,7 @@ List, preview, download, and delete files stored in Backblaze B2.
 - `apps/web/src/components/files/file-preview-media.tsx` — `PreviewMedia` owns the media load state so the skeleton persists until the `load` event (its own module to keep the dialog under the 300-line ceiling)
 - `apps/web/src/components/files/file-metadata-panel.tsx` — structured metadata display
 - `apps/web/src/lib/file-tree.ts` — `buildFileTree()` converts flat S3 keys to a folder/file hierarchy; `initialExpandedPaths()` decides how deep to auto-expand so file rows are actually on screen
-- `apps/web/src/lib/preview-deep-link.ts` — `previewHref()` / `ancestorPaths()` / `takePreviewKeyFromUrl()` for the `?preview=<key>` hand-off used by the ⌘K palette and the dashboard
+- `apps/web/src/lib/preview-deep-link.ts` — `previewHref()` / `ancestorPaths()` / `takePreviewKeyFromUrl()` for the `?preview=<key>` hand-off used by the ⌘K palette
 - `apps/web/src/lib/browser-download.ts` — `startBrowserDownload()`: anchor-click navigation that survives an expired user activation
 - `apps/web/src/lib/loading-progress.ts` + `apps/web/src/components/common/loading-notice.tsx` — visible, escalating copy for a wait that can take seconds
 - `apps/web/src/lib/file-list-limit.ts` — `FILE_LIST_LIMIT` + `fileListTruncationNotice()`: the copy that admits the list is capped
@@ -27,6 +27,7 @@ List, preview, download, and delete files stored in Backblaze B2.
 - `services/api/app/repo/b2_client.py` — `list_files()`, `get_file_metadata()`, `get_presigned_url(..., disposition=)`, `delete_file()`
 - `services/api/app/repo/list_cache.py` — single-flight, stale-while-revalidate cache for full-bucket listings (storage-agnostic; the caller supplies the fetch). `prewarm()` warms it at startup
 - `services/api/app/repo/b2_object.py` — `get_object_bytes()` (object download for detail recompute)
+- `services/api/app/service/metadata.py` — `extract_metadata()`: size, MIME, extension, MD5, SHA-256, image width/height and EXIF (plus PDF and audio/video fields for other objects in the bucket), run only by `/files-by-key/detail`
 
 ## Canonical Files
 - File route handlers: `services/api/app/runtime/files.py`
@@ -36,7 +37,7 @@ List, preview, download, and delete files stored in Backblaze B2.
 ## Inputs
 - prefix: string (optional filter for file listing)
 - limit: int (max files to return, 1-1000, default 100)
-- key: string (file key for get/download/delete — sent as a query parameter by the web client; no path traversal)
+- key: string (file key for get/download/delete — sent as a query parameter by the web client; no path traversal; must start with `ALLOWED_KEY_PREFIX`, default `colorization/`)
 
 ## Outputs
 - `GET /files` → `FileMetadata[]` (sorted most recent first)
@@ -53,7 +54,7 @@ List, preview, download, and delete files stored in Backblaze B2.
 - When the response hits that limit, a notice states how much of the bucket is not listed ("Showing the 100 most recent of N objects"), read from `/files/stats`. The card is titled "Recent Files", not "All Files" — there is no pagination yet (see the tech-debt tracker)
 - Files organized into tree view — folders expand/collapse, files shown with type-specific icons
 - Folders auto-expand on load, level by level, until the **majority** of the listed files are visible (`initialExpandedPaths()`). Expanding only the top level could leave the page showing four folder rows and zero files while instructing the user to click one, because the newest objects lived two levels deep. Stopping at the *first* visible file was then still wrong: a single stray top-level object satisfied it while the other 99 stayed collapsed and the page claimed "Showing the 100 most recent"
-- Deep link: arriving with `?preview=<key>` (`takePreviewKeyFromUrl()`) expands that key's ancestor folders (`ancestorPaths()`) and opens its preview. The ⌘K palette and the dashboard's recent-uploads rows link here so that choosing a specific file lands on that file; previously the palette pushed a bare `/files`, which did nothing visible when the user was already on the page. The param is read via `window.location` rather than `useSearchParams()` so `/files` stays statically prerenderable, and is consumed with `history.replaceState` so it doesn't re-fire
+- Deep link: arriving with `?preview=<key>` (`takePreviewKeyFromUrl()`) expands that key's ancestor folders (`ancestorPaths()`) and opens its preview. The ⌘K palette links here so that choosing a specific file lands on that file; previously the palette pushed a bare `/files`, which did nothing visible when the user was already on the page. The param is read via `window.location` rather than `useSearchParams()` so `/files` stays statically prerenderable, and is consumed with `history.replaceState` so it doesn't re-fire
 - Clicking anywhere on a file row (except the actions button) opens its preview — the row is a real `<button>` with an `aria-label` of `Preview <filename>`
 - The actions menu trigger (`Open actions for <filename>`) is rendered at full opacity at rest on every viewport, as an outlined button with full-contrast foreground so it reads as a control rather than a faint `···` glyph ~1100px from the filename; hover/focus only deepens it. It must never be hover-gated: that hid preview / download / delete from keyboard, touch, and first-time desktop users
 - Preview: opens dialog, fetches a preview-only presigned URL via `/files-by-key/preview?key=...` (does not count as a download) and renders image/PDF inline. The dialog carries the file's full action set — **Download** and **Delete** alongside the "Detailed metadata" disclosure — because "Click a file to preview it" is the path the page advertises and it used to dead-end with only a close button. Delete closes the preview and hands off to the same confirmation dialog the row menu uses. Expanding "Detailed metadata" lazily fetches `/files-by-key/detail?key=...` and renders checksums + image/PDF fields in `FileMetadataPanel`.
@@ -65,9 +66,11 @@ List, preview, download, and delete files stored in Backblaze B2.
 ## Edge Cases
 - File not found (deleted externally) → API returns 404
 - Invalid file key (traversal attempt, empty key) → API returns 400
+- Key outside `ALLOWED_KEY_PREFIX` (another workload's object in a shared bucket) → listed, but preview/download/detail/delete return 400. Set `ALLOWED_KEY_PREFIX=` (empty) to lift the confinement
+- Deleting a colorized output here leaves its batch record pointing at a missing object (its gallery tile shows a broken image); use batch delete to remove a batch's outputs consistently
 - File key contains `/`, spaces, `#`, `?`, `%`, reserved route names, or suffixes like `/download` and `/preview` → web client sends the key as a query parameter before calling get/download/preview/delete routes
 - B2 unreachable → persistent error state with retry
-- Empty bucket → upload prompt with direct Upload action
+- Empty bucket → prompt with a direct link to Bulk Ingest
 - Delete failure → API returns 500, toast error
 - Download presign slow or failed → the loading toast resolves into a success or an error toast; a browser that refuses the anchor click is reported, never silently swallowed
 - Cold bucket listing (nothing cached) → the one request that pays for the scan blocks; every later one is served from cache, including a stale snapshot while it refreshes in the background
@@ -81,7 +84,7 @@ List, preview, download, and delete files stored in Backblaze B2.
 - Preview loading: the skeleton covers the presigned-URL fetch **and** the media download, dropping only on the media's `load` event. On `error` the pane shows an error state with an "Open in a new tab" fallback. Dropping the skeleton at the presign milestone left a blank white pane that read as "no preview available"
 
 ## Verification
-- Test files: `services/api/tests/test_file_key_routes.py`, `services/api/tests/test_presign_disposition.py`, `services/api/tests/test_list_cache.py`, `apps/web/src/lib/api-client.test.ts`, `apps/web/src/lib/queries.test.ts`, `apps/web/src/lib/file-list-limit.test.ts`, `apps/web/src/lib/file-tree.test.ts`, `apps/web/src/lib/preview-deep-link.test.ts`, `apps/web/src/lib/browser-download.test.ts`, `apps/web/src/lib/loading-progress.test.ts`
+- Test files: `services/api/tests/test_file_key_routes.py`, `services/api/tests/test_key_prefix.py` (default confinement), `services/api/tests/test_file_detail.py`, `services/api/tests/test_presign_disposition.py`, `services/api/tests/test_list_cache.py`, `apps/web/src/lib/api-client.test.ts`, `apps/web/src/lib/queries.test.ts`, `apps/web/src/lib/file-list-limit.test.ts`, `apps/web/src/lib/file-tree.test.ts`, `apps/web/src/lib/preview-deep-link.test.ts`, `apps/web/src/lib/browser-download.test.ts`, `apps/web/src/lib/loading-progress.test.ts`
 - Required cases: list files, empty list, file not found, presigned URL generation, preview presigns `inline` while download presigns `attachment`, unknown disposition rejected, delete success, delete failure, optimistic cache removal on delete, truncation notice on/off, listing cache (fresh reuse / stale-served-while-refreshing / invalidation forces a fresh scan / prewarm), auto-expansion reaching the first file rows, anchor-click download reporting success and failure, loading copy escalating at its thresholds
 - Focused API verify command: `pnpm test:api`
 - Focused client route-construction command: `pnpm test:web`
@@ -90,5 +93,6 @@ List, preview, download, and delete files stored in Backblaze B2.
 - Pass criteria: focused tests and `pnpm verify` green; explain any skipped `pnpm verify:full` prerequisites
 
 ## Related Docs
+- [Photo Library](photo-library.md)
 - [ARCHITECTURE.md](../../ARCHITECTURE.md)
 - [App Workflows](../app-workflows.md)

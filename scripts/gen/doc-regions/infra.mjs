@@ -194,6 +194,7 @@ function railwayServices() {
 export const infraRunbooks = [
   {
     file: "infra/vercel/README.md",
+    target: "vercel",
     regions: {
       "vercel-services": vercelServices,
       "vercel-variables": (ctx) => variableRows(ctx, "vercel"),
@@ -203,6 +204,7 @@ export const infraRunbooks = [
   },
   {
     file: "infra/railway/README.md",
+    target: "railway",
     regions: {
       "railway-services": railwayServices,
       "railway-variables": (ctx) => variableRows(ctx, "railway", { perService: true }),

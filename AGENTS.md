@@ -18,7 +18,6 @@ packages/shared/   Shared TypeScript types, generated from the API contract
 docs/              System of record (features, workflows, security, reliability)
 docs/exec-plans/   Execution plans, tech debt, and sample.json (the gen:docs input)
 scripts/gen/       Generator policy: API naming, sample-manifest schema
-infra/vercel/      Vercel deployment contract
 infra/railway/     Railway delivery contract (per-service railway.json at their service roots)
 ```
 <!-- gen:end agents-repo-map -->
@@ -29,15 +28,17 @@ These pieces are shared scaffolding rather than app-specific code: keep them, an
 
 **Keep as-is (do not strip, rename, or replace)**
 - **UI kit / design system.** `apps/web/src/components/ui/` (shadcn primitives), the design tokens in `apps/web/src/app/globals.css`, and the `/design` reference page. Build new screens with these primitives; never edit the generated `components/ui/` files directly. Restyling happens through tokens in `globals.css`.
-- **File Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/`. The Files sidebar entry in `apps/web/src/components/layout/app-sidebar.tsx` stays.
-- **Upload.** `/upload` route, `apps/web/src/app/upload/`, and `apps/web/src/components/upload/`. The Upload sidebar entry stays.
-- The sidebar nav itself (Dashboard, Upload, Files, Settings, plus the Design System utility link).
+- **Bucket Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/`: the full-bucket view, never removed. Its sidebar entry stays.
+- **Bulk Ingest.** `/upload` route, `apps/web/src/app/upload/`, and `apps/web/src/components/upload/` (presigned PUT into `colorization/grayscale/`). Its sidebar entry stays.
+- The sidebar nav itself (Dashboard, Batches, Photo Library, Bulk Ingest, Bucket Explorer, Settings, plus the Design System utility link).
 
 **Adapt to this app**
-- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, upload chart, recent uploads table) are illustrative defaults. Replace them with metrics, charts, and tables that reflect what this app actually does (e.g. transcripts processed, embeddings indexed, classifications run). New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`, and no hand-added `qk` entry: query keys come from `pnpm gen:api`.
+- **Dashboard.** `/` route and `apps/web/src/components/dashboard/colorization-overview.tsx`: write amplification, photos ingested/colorized, batches, bytes chart, recent batches. New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`, and no hand-added `qk` entry: query keys come from `pnpm gen:api`.
 - Update `docs/features/dashboard.md` in the same PR as any dashboard change (see §9).
 
-**Why this contract exists** — the UI kit, Files, and Upload pages are the reusable B2-backed scaffolding; stripping them costs the app its whole storage surface. The dashboard is the one screen designed to be rewritten per app.
+**Why this contract exists** — the UI kit, Bucket Explorer and Bulk Ingest pages are the reusable B2-backed scaffolding; stripping them costs the app its whole storage surface.
+
+**This sample's own rules** — the B2 key layout lives only in `services/api/app/service/keys.py`. PyTorch and DDColor are imported only, and lazily, by `services/api/app/repo/ddcolor.py`; they install with `pnpm setup:ml` and are never part of `pnpm run setup`, `pnpm verify` or CI. Batch records change only through `repo/batch_store.py::mutate`. Originals under `grayscale/` are read, never written by the pipeline or deleted by batch delete.
 
 ## 3. Architectural Invariants
 
@@ -225,7 +226,6 @@ If documentation and implementation conflict, update docs in the same PR. Docume
 | The API contract itself | [docs/api/openapi.json](docs/api/openapi.json) |
 | Execution plans | [docs/exec-plans/](docs/exec-plans/) |
 | Tech debt | [docs/exec-plans/tech-debt-tracker.md](docs/exec-plans/tech-debt-tracker.md) |
-| Deploying to vercel | [infra/vercel/README.md](infra/vercel/README.md) |
 | Deploying to railway | [infra/railway/README.md](infra/railway/README.md) |
 <!-- gen:end agents-doc-map -->
 
@@ -244,7 +244,7 @@ If documentation and implementation conflict, update docs in the same PR. Docume
 ## 13. External Delivery
 
 - Never provision, deploy, migrate, publish, or create an externally reachable preview without the user's explicit approval.
-- For approved Railway or Vercel work, follow the selected platform's delivery
-  contract — [infra/railway/README.md](infra/railway/README.md) or
-  [infra/vercel/README.md](infra/vercel/README.md) — for configuration, review,
-  verification, rollback, and cleanup.
+- For approved Railway work, follow the delivery contract in
+  [infra/railway/README.md](infra/railway/README.md) for configuration, review,
+  verification, rollback, and cleanup. This sample has no Vercel target: DDColor
+  inference does not fit a serverless function.

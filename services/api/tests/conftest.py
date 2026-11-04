@@ -92,3 +92,36 @@ def isolate_download_counter(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "download_count_file", str(counter_path))
     monkeypatch.setattr(counter, "_count", 0)
     yield
+
+
+@pytest.fixture(autouse=True)
+def reset_batch_store():
+    """Batch records are cached in-process; never let one test see another's."""
+    from app.repo import batch_store
+
+    batch_store._reset_cache()
+    yield
+    batch_store._reset_cache()
+
+
+@pytest.fixture
+def fake_s3(monkeypatch):
+    """An in-memory bucket behind every repo module's `get_s3_client` seam."""
+    from app.repo import b2_client, b2_io, b2_object, b2_upload
+    from tests.fake_s3 import FakeS3
+
+    fake = FakeS3()
+    for module in (b2_client, b2_io, b2_object, b2_upload):
+        monkeypatch.setattr(module, "get_s3_client", lambda: fake)
+    return fake
+
+
+@pytest.fixture(autouse=True)
+def unconfined_keys(monkeypatch):
+    """The shipped default confines by-key ops to `colorization/`. The kit's
+    generic by-key tests exercise arbitrary key shapes, so they run unconfined;
+    the confinement itself is asserted in test_key_prefix.py."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "allowed_key_prefix", "")
+    yield

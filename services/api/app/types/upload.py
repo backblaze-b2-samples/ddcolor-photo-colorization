@@ -19,6 +19,13 @@ class FileUploadResponse(ResponseModel):
         default=None,
         description="Public object URL when the bucket is public, else null.",
     )
+    was_color: bool | None = Field(
+        default=None,
+        description=(
+            "Image ingest check: true when the photo is already in colour (it is "
+            "desaturated before inference), false for grayscale, null if unchecked."
+        ),
+    )
     metadata: FileMetadataDetail | None = Field(
         default=None,
         description="Rich metadata, when extraction succeeded for this type.",

@@ -11,7 +11,7 @@
 
 /** The verbs this app's routes actually use, narrowed from the contract. */
 export type ApiClientRoute = {
-  method: "delete" | "get" | "post";
+  method: "delete" | "get" | "patch" | "post";
   path: string;
 };
 
@@ -22,8 +22,13 @@ export type ApiClientRoute = {
  * placeholder and a `.method.toUpperCase()` stays exact.
  */
 export const API_CLIENT_ROUTES = {
+  batchDelete: { method: "delete", path: "/batches/{batch_id}" },
   fileByKeyDelete: { method: "delete", path: "/files-by-key" },
   legacyFileDelete: { method: "delete", path: "/files/{key}" },
+  batches: { method: "get", path: "/batches" },
+  batch: { method: "get", path: "/batches/{batch_id}" },
+  batchManifestDownload: { method: "get", path: "/batches/{batch_id}/manifest/download" },
+  batchStats: { method: "get", path: "/batches/stats" },
   files: { method: "get", path: "/files" },
   fileByKeyDetail: { method: "get", path: "/files-by-key/detail" },
   fileByKeyDownload: { method: "get", path: "/files-by-key/download" },
@@ -35,6 +40,11 @@ export const API_CLIENT_ROUTES = {
   fileStats: { method: "get", path: "/files/stats" },
   uploadActivity: { method: "get", path: "/files/stats/activity" },
   health: { method: "get", path: "/health" },
+  photos: { method: "get", path: "/photos" },
+  photoDetail: { method: "get", path: "/photos-by-key/detail" },
+  batchUpdate: { method: "patch", path: "/batches/{batch_id}" },
+  batchCreate: { method: "post", path: "/batches" },
+  batchRun: { method: "post", path: "/batches/{batch_id}/run" },
   uploadPresign: { method: "post", path: "/upload/presign" },
   uploadVerify: { method: "post", path: "/upload/verify" },
 } as const satisfies Record<string, ApiClientRoute>;

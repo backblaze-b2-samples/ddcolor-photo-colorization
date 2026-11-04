@@ -54,7 +54,7 @@ def _tier_and_limit(request: Request) -> tuple[str, int]:
     the tighter tier.
     """
     path = request.url.path
-    if request.method in ("POST", "DELETE") or path.endswith(
+    if request.method in ("POST", "PATCH", "DELETE") or path.endswith(
         ("/download", "/preview", "/detail")
     ):
         return "write", settings.rate_limit_write_per_minute

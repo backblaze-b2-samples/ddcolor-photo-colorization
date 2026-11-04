@@ -223,6 +223,14 @@ function renderTypes(contract) {
   for (const name of Object.keys(schemas).sort()) {
     const schema = schemas[name];
 
+    // A Pydantic Enum becomes a named schema holding only `enum`; render it as
+    // a union of its literal values so the interfaces that $ref it resolve.
+    if (Array.isArray(schema.enum)) {
+      const members = schema.enum.map((value) => JSON.stringify(value)).join(" | ");
+      blocks.push(`${jsDoc(schema.description, "")}export type ${name} = ${members};\n`);
+      continue;
+    }
+
     if (schema.type !== "object" || !schema.properties) {
       continue;
     }

@@ -24,7 +24,7 @@ def _meta(key: str, *, size_bytes: int, content_type: str) -> FileMetadata:
     return FileMetadata(
         key=key,
         filename=filename,
-        folder="uploads/",
+        folder="colorization/grayscale/",
         size_bytes=size_bytes,
         size_human=f"{size_bytes} B",
         content_type=content_type,
@@ -76,31 +76,11 @@ def test_sanitize_filename_truncates_long_names(raw):
         ("noext", "image/jpeg", True),  # no extension → not enforced
         ("x.exe", "image/jpeg", False),
         ("x.pdf", "application/octet-stream", False),  # type not in map
-        # Added file types (markdown, configs, datasets, office docs, video).
-        ("notes.md", "text/markdown", True),
-        ("notes.markdown", "text/markdown", True),
-        ("config.yaml", "application/yaml", True),
-        ("config.yml", "application/x-yaml", True),
-        ("data.jsonl", "application/x-ndjson", True),
-        ("data.ndjson", "application/x-ndjson", True),
-        ("table.tsv", "text/tab-separated-values", True),
-        ("feed.xml", "application/xml", True),
-        ("feed.xml", "text/xml", True),
-        (
-            "report.docx",
-            "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document",
-            True,
-        ),
-        (
-            "sheet.xlsx",
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet",
-            True,
-        ),
-        ("clip.mov", "video/quicktime", True),
-        ("clip.webm", "video/webm", True),
-        ("clip.mp4", "video/quicktime", False),  # extension/type mismatch
+        ("scan.tif", "image/tiff", True),
+        ("scan.tiff", "image/tiff", True),
+        ("scan.bmp", "image/bmp", True),
+        ("scan.webp", "image/webp", True),
+        ("scan.tif", "image/png", False),  # extension/type mismatch
     ],
 )
 def test_validate_extension_matches_type(filename, content_type, expected):
@@ -111,8 +91,9 @@ def test_validate_extension_matches_type(filename, content_type, expected):
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 _JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 8
-_PDF = b"%PDF-1.7\n"
-_ZIP = b"PK\x03\x04" + b"\x00" * 8
+_TIFF_LE = b"II*\x00" + b"\x00" * 8
+_TIFF_BE = b"MM\x00*" + b"\x00" * 8
+_BMP = b"BM" + b"\x00" * 8
 
 
 @pytest.mark.parametrize(
@@ -121,11 +102,12 @@ _ZIP = b"PK\x03\x04" + b"\x00" * 8
         (_PNG, "image/png", True),
         (b"<html>not a png", "image/png", False),  # spoofed image
         (_JPEG, "image/jpeg", True),
-        (_PDF, "application/pdf", True),
-        (b"nope", "application/pdf", False),
-        (_ZIP, "application/zip", True),
-        (b"any text at all", "text/plain", True),  # text has no signature
-        (b"{}", "application/json", True),  # json has no signature
+        (_TIFF_LE, "image/tiff", True),
+        (_TIFF_BE, "image/tiff", True),
+        (b"nope", "image/tiff", False),
+        (_BMP, "image/bmp", True),
+        (_PNG, "image/bmp", False),
+        (b"{}", "application/json", True),  # not an allowed type: nothing to verify
     ],
 )
 def test_matches_content_signature(data, content_type, expected):
@@ -151,7 +133,7 @@ def test_signature_predicate_agrees_with_checker():
 def test_presign_rejects_oversized(monkeypatch):
     monkeypatch.setattr(upload_service.settings, "max_file_size", 10)
     with pytest.raises(UploadError) as exc:
-        _validate_declared("a.txt", "text/plain", 999)
+        _validate_declared("a.jpg", "image/jpeg", 999)
     assert exc.value.status_code == 413
 
 
@@ -163,13 +145,13 @@ def test_presign_rejects_disallowed_type():
 
 def test_presign_rejects_extension_mismatch():
     with pytest.raises(UploadError) as exc:
-        _validate_declared("a.png", "text/plain", 4)
+        _validate_declared("a.png", "image/jpeg", 4)
     assert exc.value.status_code == 415
 
 
 def test_presign_rejects_empty_file():
     with pytest.raises(UploadError):
-        _validate_declared("a.txt", "text/plain", 0)
+        _validate_declared("a.jpg", "image/jpeg", 0)
 
 
 def test_presign_returns_signed_put(monkeypatch):
@@ -187,7 +169,7 @@ def test_presign_returns_signed_put(monkeypatch):
     monkeypatch.setattr(upload_service, "generate_presigned_upload", fake_sign)
     result = create_presigned_upload("My Photo.png", "image/png", 1234)
 
-    assert result.key == "uploads/My_Photo.png"
+    assert result.key == "colorization/grayscale/My_Photo.png"
     assert result.url == "https://b2.example/signed-put"
     assert result.headers["Content-Type"] == "image/png"
     # The exact size + type are signed in, so B2 enforces them.
@@ -195,41 +177,26 @@ def test_presign_returns_signed_put(monkeypatch):
     assert captured["content_type"] == "image/png"
 
 
-# --- newly allowed file types clear presign validation ----------------------
+# --- Bulk Ingest is image-only -----------------------------------------------
 
 
 @pytest.mark.parametrize(
     ("filename", "content_type"),
-    [
-        ("notes.md", "text/markdown"),
-        ("config.yaml", "application/yaml"),
-        ("config.yml", "application/x-yaml"),
-        ("data.jsonl", "application/x-ndjson"),
-        ("table.tsv", "text/tab-separated-values"),
-        ("feed.xml", "application/xml"),
-        ("feed.xml", "text/xml"),
-        (
-            "report.docx",
-            "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document",
-        ),
-        (
-            "sheet.xlsx",
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet",
-        ),
-        (
-            "deck.pptx",
-            "application/vnd.openxmlformats-officedocument."
-            "presentationml.presentation",
-        ),
-        ("clip.mov", "video/quicktime"),
-        ("clip.webm", "video/webm"),
-    ],
+    [("scan.tif", "image/tiff"), ("scan.bmp", "image/bmp"), ("scan.webp", "image/webp")],
 )
-def test_presign_accepts_new_filetypes(filename, content_type):
-    """Each newly allowed type clears the allow-list + extension checks."""
-    assert _validate_declared(filename, content_type, 16) == f"uploads/{filename}"
+def test_presign_accepts_scan_formats(filename, content_type):
+    expected = f"colorization/grayscale/{filename}"
+    assert _validate_declared(filename, content_type, 16) == expected
+
+
+@pytest.mark.parametrize(
+    ("filename", "content_type"),
+    [("doc.pdf", "application/pdf"), ("notes.txt", "text/plain"), ("clip.mp4", "video/mp4")],
+)
+def test_presign_rejects_non_images(filename, content_type):
+    with pytest.raises(UploadError) as exc:
+        _validate_declared(filename, content_type, 16)
+    assert exc.value.status_code == 415
 
 
 # --- post-upload verification (HEAD + Range-GET sniff) -----------------------
@@ -252,46 +219,47 @@ def _wire_verify(monkeypatch, *, metadata, head_bytes):
     monkeypatch.setattr(
         upload_service, "invalidate_listing", lambda: invalidated.append(True)
     )
+    monkeypatch.setattr(upload_service, "check_color", lambda key: False)
     return deleted, invalidated
 
 
 def test_verify_accepts_valid_object(monkeypatch):
-    meta = _meta("uploads/a.png", size_bytes=16, content_type="image/png")
+    meta = _meta("colorization/grayscale/a.png", size_bytes=16, content_type="image/png")
     deleted, invalidated = _wire_verify(
         monkeypatch, metadata=meta, head_bytes=_PNG_HEAD
     )
-    result = verify_upload("uploads/a.png")
-    assert result.key == "uploads/a.png"
+    result = verify_upload("colorization/grayscale/a.png")
+    assert result.key == "colorization/grayscale/a.png"
     assert result.metadata is None  # rich extraction stays on-demand
     assert deleted == []
     assert invalidated == [True]  # new object made visible
 
 
 def test_verify_rejects_and_deletes_signature_mismatch(monkeypatch):
-    meta = _meta("uploads/a.png", size_bytes=16, content_type="image/png")
+    meta = _meta("colorization/grayscale/a.png", size_bytes=16, content_type="image/png")
     deleted, _ = _wire_verify(
         monkeypatch, metadata=meta, head_bytes=b"<html>not a png"
     )
     with pytest.raises(UploadError) as exc:
-        verify_upload("uploads/a.png")
+        verify_upload("colorization/grayscale/a.png")
     assert exc.value.status_code == 415
-    assert deleted == ["uploads/a.png"]  # invalid object removed
+    assert deleted == ["colorization/grayscale/a.png"]  # invalid object removed
 
 
 def test_verify_rejects_oversize(monkeypatch):
     monkeypatch.setattr(upload_service.settings, "max_file_size", 10)
-    meta = _meta("uploads/big.txt", size_bytes=999, content_type="text/plain")
+    meta = _meta("colorization/grayscale/big.jpg", size_bytes=999, content_type="image/jpeg")
     deleted, _ = _wire_verify(monkeypatch, metadata=meta, head_bytes=b"x")
     with pytest.raises(UploadError) as exc:
-        verify_upload("uploads/big.txt")
+        verify_upload("colorization/grayscale/big.jpg")
     assert exc.value.status_code == 413
-    assert deleted == ["uploads/big.txt"]
+    assert deleted == ["colorization/grayscale/big.jpg"]
 
 
 def test_verify_missing_object_is_404(monkeypatch):
     deleted, _ = _wire_verify(monkeypatch, metadata=None, head_bytes=b"")
     with pytest.raises(UploadError) as exc:
-        verify_upload("uploads/gone.txt")
+        verify_upload("colorization/grayscale/gone.txt")
     assert exc.value.status_code == 404
     assert deleted == []  # nothing to delete
 
@@ -301,22 +269,11 @@ def test_verify_rejects_key_outside_uploads_prefix():
         verify_upload("other/evil.txt")
 
 
-def test_verify_skips_range_get_for_signatureless_type(monkeypatch):
-    """Text/data types have no signature, so verify must not fetch header bytes."""
-    meta = _meta("uploads/notes.md", size_bytes=12, content_type="text/markdown")
-    fetched: list[int] = []
-    monkeypatch.setattr(upload_service, "get_file_metadata", lambda key: meta)
-    monkeypatch.setattr(
-        upload_service,
-        "get_object_head_bytes",
-        lambda key, length: fetched.append(length) or b"",
-    )
-    monkeypatch.setattr(upload_service, "delete_file", lambda key: None)
-    monkeypatch.setattr(upload_service, "invalidate_listing", lambda: None)
-
-    result = verify_upload("uploads/notes.md")
-    assert result.key == "uploads/notes.md"
-    assert fetched == []  # no wasted Range-GET
+def test_verify_reports_was_color(monkeypatch):
+    meta = _meta("colorization/grayscale/a.png", size_bytes=16, content_type="image/png")
+    _wire_verify(monkeypatch, metadata=meta, head_bytes=_PNG_HEAD)
+    monkeypatch.setattr(upload_service, "check_color", lambda key: True)
+    assert verify_upload("colorization/grayscale/a.png").was_color is True
 
 
 # --- uploads_total metric increments on verify ------------------------------
@@ -327,10 +284,10 @@ async def test_successful_verify_increments_uploads_metric(client, monkeypatch):
     from app.runtime import metrics
 
     monkeypatch.setattr(metrics, "_upload_count", 0)
-    meta = _meta("uploads/a.txt", size_bytes=5, content_type="text/plain")
-    _wire_verify(monkeypatch, metadata=meta, head_bytes=b"hello")
+    meta = _meta("colorization/grayscale/a.png", size_bytes=16, content_type="image/png")
+    _wire_verify(monkeypatch, metadata=meta, head_bytes=_PNG_HEAD)
 
-    resp = await client.post("/upload/verify", json={"key": "uploads/a.txt"})
+    resp = await client.post("/upload/verify", json={"key": "colorization/grayscale/a.png"})
     assert resp.status_code == 200
 
     metrics_resp = await client.get("/metrics")

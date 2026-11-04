@@ -221,6 +221,14 @@ If a fresh clone fails dependency installation, first confirm that
 `services/api/requirements.lock` is present and rerun `pnpm run setup`; do not
 run an unconstrained install from `requirements.txt` as a recovery shortcut.
 
+The optional ML stack is outside this workflow: `services/api/requirements-ml.txt`
+is installed by `pnpm setup:ml` only, never by setup or CI, and is pinned with
+bounded windows rather than a lock. See
+[dev-workflows.md](dev-workflows.md#optional-ml-install). `pnpm verify` must stay
+green both with and without it: the tests replace only the DDColor call, and
+`tests/test_structure.py` asserts the stack is imported only, and lazily, by
+`app/repo/ddcolor.py`.
+
 ## Agent-docs check
 
 `pnpm check:agent-docs` validates the canonical `AGENTS.md` surface, including

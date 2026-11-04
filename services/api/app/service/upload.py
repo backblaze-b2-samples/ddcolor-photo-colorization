@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Callable
 from typing import NoReturn
@@ -8,98 +9,45 @@ from app.repo import (
     generate_presigned_upload,
     get_file_metadata,
     get_object_head_bytes,
+    imaging,
     invalidate_listing,
 )
+from app.repo.b2_io import put_object_bytes
+from app.repo.b2_object import get_object_bytes
+from app.service import keys
 from app.service.files import FileKeyError, validate_key
 from app.types import FileUploadResponse, PresignUploadResponse
 from app.types.formatting import humanize_bytes
 
-# Note: image/svg+xml is deliberately excluded. SVGs can embed <script>, so a
-# file stored and later served from a public bucket URL would execute in the
-# browser (stored XSS). Re-add only with server-side SVG sanitization.
+# Bulk Ingest accepts raster scans only: the colorization pipeline decodes them
+# with Pillow. image/svg+xml stays excluded (SVG can embed <script>, a stored
+# XSS risk when served from a public bucket).
 ALLOWED_TYPES = {
     "image/jpeg",
     "image/png",
-    "image/gif",
+    "image/tiff",
     "image/webp",
-    "application/pdf",
-    "text/plain",
-    "text/csv",
-    "application/json",
-    "application/zip",
-    "video/mp4",
-    "audio/mpeg",
-    "audio/wav",
-    # Text / data formats common in the sample apps built on this kit
-    # (markdown docs, configs, datasets, tabular/structured exports).
-    "text/markdown",
-    "application/yaml",
-    "application/x-yaml",
-    "application/x-ndjson",
-    "text/tab-separated-values",
-    "application/xml",
-    "text/xml",
-    # Office documents (OOXML) for document-ingestion / RAG samples.
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    # Additional video containers (mp4 already above).
-    "video/quicktime",
-    "video/webm",
+    "image/bmp",
 }
-
-_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-_PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 MIME_EXTENSION_MAP: dict[str, set[str]] = {
     "image/jpeg": {"jpg", "jpeg", "jfif"},
     "image/png": {"png"},
-    "image/gif": {"gif"},
+    "image/tiff": {"tif", "tiff"},
     "image/webp": {"webp"},
-    "application/pdf": {"pdf"},
-    "text/plain": {"txt", "text", "log", "md"},
-    "text/csv": {"csv"},
-    "application/json": {"json"},
-    "application/zip": {"zip"},
-    "video/mp4": {"mp4"},
-    "audio/mpeg": {"mp3", "mpeg"},
-    "audio/wav": {"wav"},
-    "text/markdown": {"md", "markdown"},
-    "application/yaml": {"yaml", "yml"},
-    "application/x-yaml": {"yaml", "yml"},
-    "application/x-ndjson": {"jsonl", "ndjson"},
-    "text/tab-separated-values": {"tsv"},
-    "application/xml": {"xml"},
-    "text/xml": {"xml"},
-    _DOCX: {"docx"},
-    _XLSX: {"xlsx"},
-    _PPTX: {"pptx"},
-    "video/quicktime": {"mov"},
-    "video/webm": {"webm"},
+    "image/bmp": {"bmp"},
 }
 
-# Magic-byte signatures for the binary types we accept. The client-declared
-# content_type is untrusted, so we sniff the leading bytes and reject obvious
-# mismatches (e.g. an HTML/script payload uploaded as image/png). Text-like
-# types (text/plain, text/csv, application/json) and the OOXML/container types
-# have no reliable leading signature and are intentionally absent — they skip
-# this check but remain constrained by the extension/type consistency check.
-# This dict is the single source of truth for BOTH the check and
-# `content_type_has_signature()`, so the verify path never fetches header bytes
-# for a type it wouldn't inspect.
+# Magic-byte signatures. The client-declared content_type is untrusted, so the
+# leading bytes are sniffed and an obvious mismatch (e.g. an HTML payload sent
+# as image/png) is rejected. Every allowed type has a signature. This dict is
+# the single source of truth for both checks below.
 _CONTENT_SIGNATURES: dict[str, Callable[[bytes], bool]] = {
     "image/jpeg": lambda d: d[:3] == b"\xff\xd8\xff",
     "image/png": lambda d: d[:8] == b"\x89PNG\r\n\x1a\n",
-    "image/gif": lambda d: d[:6] in (b"GIF87a", b"GIF89a"),
+    "image/tiff": lambda d: d[:4] in (b"II*\x00", b"MM\x00*"),
     "image/webp": lambda d: d[:4] == b"RIFF" and d[8:12] == b"WEBP",
-    "application/pdf": lambda d: d[:5] == b"%PDF-",
-    "application/zip": lambda d: d[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),
-    "video/mp4": lambda d: d[4:8] == b"ftyp",  # ISO base media 'ftyp' box
-    # ID3 tag, or an MPEG audio frame sync (11 set bits).
-    "audio/mpeg": lambda d: d[:3] == b"ID3"
-    or (len(d) >= 2 and d[0] == 0xFF and (d[1] & 0xE0) == 0xE0),
-    "audio/wav": lambda d: d[:4] == b"RIFF" and d[8:12] == b"WAVE",
+    "image/bmp": lambda d: d[:2] == b"BM",
 }
 
 
@@ -116,6 +64,8 @@ def matches_content_signature(data: bytes, content_type: str) -> bool:
     check = _CONTENT_SIGNATURES.get(content_type)
     return check(data) if check else True
 
+
+logger = logging.getLogger(__name__)
 
 _SAFE_FILENAME_RE = re.compile(r"[^\w\-.]")
 
@@ -161,9 +111,9 @@ class UploadError(Exception):
         super().__init__(detail)
 
 
-# Every object the app writes lives under this prefix; the API mints the key so
-# the client never chooses where its bytes land.
-UPLOAD_PREFIX = "uploads/"
+# Originals land in the grayscale/ prefix of the app's key layout; the API mints
+# the key so the client never chooses where its bytes land.
+UPLOAD_PREFIX = keys.grayscale_prefix()
 # Leading bytes fetched for the post-upload sniff. The deepest signature check
 # reads data[8:12]; 512 leaves generous headroom for any future signature.
 _SNIFF_BYTES = 512
@@ -237,7 +187,7 @@ def verify_upload(key: str) -> FileUploadResponse:
     Enabling quarantine→promote (see the design plan) closes that window.
     """
     if not key.startswith(UPLOAD_PREFIX):
-        raise UploadError("Upload key must be under the uploads/ prefix")
+        raise UploadError(f"Upload key must be under the {UPLOAD_PREFIX} prefix")
     try:
         validate_key(key)
     except FileKeyError as e:
@@ -276,6 +226,7 @@ def verify_upload(key: str) -> FileUploadResponse:
 
     # The browser stored the object, so the shared listing cache is now stale.
     invalidate_listing()
+    was_color = check_color(key)
     return FileUploadResponse(
         key=metadata.key,
         filename=metadata.filename,
@@ -284,5 +235,26 @@ def verify_upload(key: str) -> FileUploadResponse:
         content_type=metadata.content_type,
         uploaded_at=metadata.uploaded_at,
         url=metadata.url,
+        was_color=was_color,
         metadata=None,
     )
+
+
+def check_color(key: str) -> bool | None:
+    """Measure an ingested original's saturation and flag colour images.
+
+    A colour photo is still accepted (the pipeline desaturates it to luminance
+    before inference); the flag is a small marker object under
+    `flags/was-color/` that the Photo Library reads with one listing. Never
+    fails the upload: an unreadable image returns None and is logged.
+    """
+    try:
+        img = imaging.open_image(get_object_bytes(key), max_pixels=settings.max_photo_pixels)
+        if not imaging.is_color(img):
+            return False
+        score = f"{imaging.mean_saturation(img):.3f}".encode()
+        put_object_bytes(keys.was_color_key(key), score, "text/plain")
+        return True
+    except (RuntimeError, imaging.ImageDecodeError) as e:
+        logger.warning("Saturation check skipped for %s: %s", key, e)
+        return None

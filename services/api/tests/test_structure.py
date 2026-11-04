@@ -100,3 +100,33 @@ def test_all_layers_exist():
         assert layer_dir.exists(), f"Missing layer directory: app/{layer}/"
         init_file = layer_dir / "__init__.py"
         assert init_file.exists(), f"Missing __init__.py in app/{layer}/"
+
+
+ML_MODULES = ("torch", "torchvision", "timm", "cv2", "ddcolor", "basicsr", "huggingface_hub")
+ML_ADAPTER = APP_ROOT / "repo" / "ddcolor.py"
+
+
+def test_ml_stack_only_in_ddcolor_adapter():
+    """torch / DDColor and their closure are imported only by repo/ddcolor.py,
+    so the core API and `pnpm verify` run without the optional ML stack."""
+    violations = []
+    for pyfile in _get_python_files(APP_ROOT):
+        if pyfile == ML_ADAPTER:
+            continue
+        for imp in _get_imports(pyfile):
+            if imp.split(".")[0] in ML_MODULES:
+                rel = pyfile.relative_to(APP_ROOT.parent)
+                violations.append(f"{rel}: imports {imp} outside repo/ddcolor.py")
+    assert violations == [], "ML containment violations:\n" + "\n".join(violations)
+
+
+def test_ml_adapter_imports_the_stack_lazily():
+    """No module-level torch/DDColor import: importing the app must stay light."""
+    tree = ast.parse(ML_ADAPTER.read_text())
+    top_level = [
+        alias.name if isinstance(node, ast.Import) else node.module
+        for node in tree.body
+        if isinstance(node, ast.Import | ast.ImportFrom)
+        for alias in (node.names if isinstance(node, ast.Import) else [node])
+    ]
+    assert not [m for m in top_level if m and m.split(".")[0] in ML_MODULES]

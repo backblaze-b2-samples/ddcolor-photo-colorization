@@ -51,7 +51,7 @@ def get_s3_client():
             read_timeout=30,
             retries={"mode": "standard", "total_max_attempts": 3},
             signature_version="s3v4",
-            user_agent_extra="b2ai-oss-start",
+            user_agent_extra="b2ai-ddcolor-photo-colorization",
         ),
     )
 

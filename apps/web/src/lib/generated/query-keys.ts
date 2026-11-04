@@ -22,10 +22,15 @@
  */
 export const qk = {
   all: ["b2"] as const,
+  batches: (limit?: number) => [...qk.all, "batches", limit ?? 50] as const,
+  batch: () => [...qk.all, "batches", "detail"] as const,
+  batchStats: () => [...qk.all, "batches", "stats"] as const,
   files: (prefix?: string, limit?: number) => [...qk.all, "files", prefix ?? "", limit ?? 100] as const,
   detail: (key: string) => [...qk.all, "detail", key] as const,
   preview: (key: string) => [...qk.all, "preview", key] as const,
   stats: () => [...qk.all, "stats"] as const,
   uploadActivity: (days?: number) => [...qk.all, "stats", "activity", days ?? 7] as const,
   health: () => [...qk.all, "health"] as const,
+  photos: (limit?: number, cursor?: string) => [...qk.all, "photos", limit ?? 48, cursor] as const,
+  photoDetail: (key: string) => [...qk.all, "photos", "detail", key] as const,
 };

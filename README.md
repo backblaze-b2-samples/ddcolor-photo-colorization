@@ -1,95 +1,60 @@
-<!-- last_verified: 2026-08-12 -->
+<!-- last_verified: 2026-11-04 -->
 <!-- gen:begin readme-header -->
-# Vibe Coding Starter Kit
+# DDColor Photo Colorization
 
-Stop wiring boilerplate and start building. A well-engineered full-stack foundation — dashboard, drag-and-drop upload and a file browser — with Backblaze B2 storage already wired in, so builders skip the boilerplate loop.
+Colorize black-and-white photo archives with DDColor and keep every original and output in Backblaze B2. A batch photo colorization pipeline that bulk-ingests black-and-white scans to Backblaze B2, runs DDColor locally to produce full-color reconstructions at original resolution, and writes colorized outputs, side-by-side comparisons and a per-run manifest CSV back to B2 next to the untouched originals, so archives keep provenance and editorial teams can serve results through presigned URLs.
 
 Built for developers and AI coding agents: the scaffolding, the storage
 wiring and the agent-facing docs are already done, so you start on your
 app's own features instead of rebuilding the same shell. Storage is
-**[Backblaze B2](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)**, integrated through the S3-compatible API.
+**[Backblaze B2](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-ddcolor-photo-colorization)**, integrated through the S3-compatible API.
 
 **What you get out of the box:**
 - Full-stack dashboard UI (Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query, Recharts)
-- File Upload — drag-and-drop upload with real-time progress
-- File Browser — list, preview, download, delete files
-- Dashboard — stats cards, upload chart, recent uploads
-- Metadata Extraction — image dimensions, EXIF, PDF info, checksums
+- Batches — create, edit, delete and run colorization batches with a per-run manifest
+- Colorization — DDColor runs locally (CUDA, Apple MPS or CPU) and keeps the original resolution
+- Photo Library — grayscale originals with before/after views of every colorized version
+- Bulk Ingest — drag-and-drop many scans straight to the grayscale prefix by presigned PUT
+- Dashboard — photos ingested and colorized, derived bytes and the write-amplification ratio
+- Bucket Explorer — browse, preview, download and delete any object in the bucket
 - Settings — theme plus labelled demo preference fields
-- Backend with a strict layered architecture and structural tests (FastAPI, Python 3.12+, boto3, Pydantic v2, Pillow, PyPDF2)
+- Backend with a strict layered architecture and structural tests (FastAPI, Python 3.12+, boto3, Pydantic v2, Pillow, DDColor (PyTorch, optional ML extra))
 - Agent-optimized docs — your AI coding agent can read the repo and start contributing immediately
 <!-- gen:end readme-header -->
 
 <!-- gen:begin readme-screenshots -->
-## What it looks like
 
-**Dashboard** — stats, upload activity, and recent uploads at a glance:
-
-![Dashboard view showing stat cards, upload activity chart, and recent uploads table](docs/images/b2-starterkit-dashboard1.png)
-
-**File browser** — tree view with preview, download, and delete:
-
-![File browser view showing a tree of files with hover actions](docs/images/b2-starterkit-fileview2.png)
-
-> **Deploy your own in one click** → [Deploy to Vercel](#deploying-to-vercel). One project, one origin, no CORS to wire up.
 <!-- gen:end readme-screenshots -->
 
 ## Quick Start
 
-You need: Node.js >= 20, pnpm >= 10, Python >= 3.12, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)**.
-
-### Start a new project
-
-**Option 1: GitHub Template (recommended)**
-
-Click the green **"Use this template"** button at the top of this repo, name your project, then:
+You need: Node.js >= 20, pnpm >= 10, Python >= 3.12, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-ddcolor-photo-colorization)**. No other API key: DDColor runs on your machine.
 
 ```bash
-git clone https://github.com/yourorg/my-cool-app.git
-cd my-cool-app
+git clone https://github.com/backblaze-b2-samples/ddcolor-photo-colorization.git
+cd ddcolor-photo-colorization
+pnpm run setup      # .env from .env.example, workspace deps, API venv (core deps only)
+pnpm setup:ml       # optional ML stack: PyTorch + DDColor (needed to colorize)
 ```
 
-**Option 2: Clone and reinitialize**
+> Use the `pnpm run` form for `setup` and `doctor`: both are built-in pnpm
+> commands before pnpm 11, so bare `pnpm setup` would run pnpm's own command.
 
-```bash
-git clone https://github.com/backblaze-b2-samples/vibe-coding-starter-kit.git my-cool-app
-cd my-cool-app
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit from vibe-coding-starter-kit"
-```
+`pnpm run setup` copies `.env.example` to `.env` only when `.env` does not
+already exist, installs workspace dependencies from `pnpm-lock.yaml`, creates
+`services/api/.venv`, validates that it uses Python 3.12+, and installs the API's
+committed Python 3.12 resolution from `services/api/requirements.lock`. It is
+safe to rerun. `pnpm setup:ml` adds the pinned PyTorch/DDColor stack from
+`services/api/requirements-ml.txt` into that venv (see
+[Colorization](docs/features/colorization.md) for why it is a separate step).
 
-Either way you get a clean project with no upstream history — ready to push to your own repo and point your agent at it.
-
-### Setup
-
-**1. Run setup**
-
-```bash
-pnpm run setup
-```
-
-This copies `.env.example` to `.env` only when `.env` does not already exist,
-installs workspace dependencies from `pnpm-lock.yaml`, creates
-`services/api/.venv` if missing, validates that an existing venv uses Python
-3.12+, and installs the API's committed Python 3.12 resolution from
-`services/api/requirements.lock`. It is safe to rerun and never overwrites an
-existing `.env`.
-
-> Use the `pnpm run` form: `setup` (like `doctor`) is a built-in pnpm command
-> before pnpm 11, so bare `pnpm setup` would run pnpm's own command instead of
-> this script.
-
-**2. Add your B2 credentials**
-
-Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) and:
+**Add your B2 credentials.** Open `.env`, then in the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-ddcolor-photo-colorization):
 
 <!-- gen:begin readme-credentials -->
 1. **Create a bucket** and an **application key** with `Read and Write`
    permission, then paste each value into `.env`:
    - `B2_APPLICATION_KEY_ID` — B2 application key ID (**keyID** in the B2 console)
-   - `B2_APPLICATION_KEY` — B2 application key (**applicationKey**) — shown once at creation
+   - `B2_APPLICATION_KEY` — B2 application key (**applicationKey**), shown once at creation
    - `B2_BUCKET_NAME` — bucket unique name (**Bucket Unique Name** in the B2 console)
    - `B2_REGION` — the region inside the bucket's **Endpoint** (`s3.<region>.backblazeb2.com`); the S3 endpoint is derived from it
 
@@ -99,137 +64,114 @@ Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 d
 
 > Want a walkthrough? See the docs for [creating a bucket](https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets) and [creating app keys](https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys).
 
-**3. Run it**
+**Run it, seed it, colorize it.**
 
 ```bash
-pnpm dev
+pnpm dev            # web on localhost:3000, API on localhost:8000
+pnpm seed:demo      # optional: 8 public-domain historical photos into colorization/grayscale/
 ```
 
-That's it. Frontend at `localhost:3000`, API at `localhost:8000`. Upload a file and see it working. Interactive API docs (Swagger UI) are at `localhost:8000/docs`, with ReDoc at `/redoc`.
+Open **Batches → New batch**, keep the defaults (DDColor tiny, input 512, JPEG,
+comparisons on, run now) and create it. The batch page polls while the worker
+colorizes each photo; when it finishes you get a before/after gallery, a manifest
+CSV, and the dashboard's write-amplification ratio moves. The first run downloads
+the model weights from the Hugging Face Hub (about 220 MB for the tiny model, no
+token needed).
 
-`pnpm dev` runs the preflight check first — it catches the common setup gotchas (wrong Node/Python version, missing venv, missing or placeholder `.env`, ports already taken) and tells you exactly how to fix each one. Run it standalone any time with `pnpm run doctor`.
+`pnpm dev` runs a preflight first (Node/Python versions, venv, placeholder
+`.env`, busy ports) and says how to fix each problem; run it alone with
+`pnpm run doctor`. Interactive API docs are at `localhost:8000/docs`.
 
 ### Supported local environments
 
-Local scripts run on macOS, Linux, and WSL2 — native Windows isn't supported
-yet (the dev scripts use POSIX shell syntax), so use WSL2 on Windows. Cloud or
-sandboxed agent environments also need permission to install dependencies and to
-bind localhost ports; see
-[docs/verification.md](docs/verification.md#local-environments) for the sandbox,
-port-fallback, and IPv6 behavior.
+Local scripts run on macOS, Linux, and WSL2; native Windows is not supported
+(the dev scripts use POSIX shell syntax). Colorization picks the first available
+of CUDA, Apple MPS, then CPU; it never requires a GPU. Sandboxed agent
+environments also need permission to install dependencies and bind localhost
+ports; see [docs/verification.md](docs/verification.md#local-environments).
+
+## How it works
+
+```
+browser ──presigned PUT──▶ B2  colorization/grayscale/<scan>          (never modified)
+   │
+   └─ POST /batches ─▶ API ─▶ background worker (one batch at a time)
+                               per photo: get_object ─▶ DDColor (local) ─▶ put_object
+                                 colorization/colorized/<batch>/<stem>.jpg   original resolution
+                                 colorization/comparisons/<batch>/<stem>.jpg side-by-side
+                               after the last photo:
+                                 colorization/manifests/<batch>.csv          provenance
+                                 colorization/batches/<batch>.json           status, counts
+```
+
+- **B2 is the only store.** Originals, outputs, comparisons, manifests and the
+  batch records themselves are objects under one `colorization/` prefix; there is
+  no database. Editorial tools and CMS jobs read results through presigned URLs.
+- **Write amplification is the point.** Every ingested scan yields a colorized
+  counterpart, optionally a comparison image, and a manifest row; re-running with
+  another model keeps both versions side by side. The dashboard headlines stored
+  bytes per ingested byte (3.4x for the seeded demo with comparisons on).
+- **DDColor runs locally**, inside the API process, following DDColor's own
+  pipeline: predict the colour (`ab`) channels at 256 or 512 px, resize them to
+  the original size and recombine them with the original luminance, so the output
+  has the scan's exact dimensions.
 
 ## When to use
 
-Use this repository as a template or sample implementation when you want to
-clone or fork a working file-management dashboard, connect it to your own B2
-bucket, and then rebrand and extend it for your application. It provides
-production-minded engineering controls—including strict architecture,
-contract checks, tests, linting, and deployment runbooks—so you can begin with
-a dependable scaffold instead of a blank prototype.
+Use this sample when you run a digital archive, a newspaper morgue or a
+historical-society collection and want a self-hosted, reproducible colorization
+workflow: bulk-ingest scans, colorize them in auditable batches, keep originals
+untouched beside every derived version, and hand results to editors or a CMS by
+URL. It is also a working reference for running an open-source vision model over
+objects in Backblaze B2 through the S3-compatible API.
 
 ## When not to use
 
-Do not choose this repository expecting a complete hosted SaaS product or a
-drop-in production service. It does not provide managed hosting, user accounts,
-authentication, tenant isolation, billing, or on-call operations. Before using
-an adapted application in production, you own its product-specific security,
-operations, capacity, compliance, and support decisions.
+Do not use it as a restoration tool: DDColor adds plausible colour, it does not
+repair scratches, tears or blur, and the colours are a model's estimate, not
+historical fact, so label published results accordingly. It is not a hosted
+service: there is no authentication, no user accounts and no tenant isolation,
+and the API is meant to run on a trusted machine or a private deployment.
 
 ## Why Backblaze B2?
 
-[Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) is the object storage this kit is built around — a deliberate default, not just a demo backend:
+[Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-ddcolor-photo-colorization) is the storage layer for every byte this pipeline touches:
 
-- **S3-compatible API.** B2 speaks the S3 API, so the `boto3` calls, SDKs, and tooling you already use for AWS S3 work unchanged — you just point them at B2's endpoint. This kit uses the S3-compatible API throughout (isolated in `services/api/app/repo/`), so nothing is locked to a proprietary client.
-- **Built for data-heavy apps.** B2 storage runs at a fraction of hyperscaler pricing with generous free egress to many CDN and compute partners — what you want when an AI app accumulates uploads, datasets, model artifacts, and generated media.
-- **Free to start.** A [free B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) is enough to run everything in this repo.
-
-## Building Your App
-
-When you adapt this kit for a new app, keep the shared scaffolding and only swap out what's app-specific:
-
-- **Keep** the UI kit (`apps/web/src/components/ui/` + design tokens in `globals.css` + `/design`).
-- **Keep** the File Explorer (`/files`) and Upload (`/upload`) pages and their sidebar nav entries — they're the reusable B2-backed surface.
-- **Adapt** the Dashboard (`/`) to your use case — replace the default stats, chart, and recent uploads with metrics that reflect what your app actually does.
-- **Rebrand** by editing a single file: `apps/web/src/lib/app-config.ts` holds the app name and description (`APP_NAME`, `APP_DESCRIPTION`). Changing them there updates the page title, sidebar, and breadcrumb everywhere — no other files to touch.
-
-Full contract and rationale: [AGENTS.md §2 — Shared Scaffolding Contract](AGENTS.md#2-shared-scaffolding-contract).
-
-## Agent-First Architecture
-
-This repo is optimized for coding agents. Use the template, point your agent at it, and start building.
-
-The structure follows the principle that **repository knowledge is the system of record**. Anything an agent can't access in-context doesn't exist — so everything it needs to reason about the codebase is versioned, co-located, and discoverable from the repo itself.
-
-### How it works
-
-**[AGENTS.md](AGENTS.md) is the single source of truth for all coding agents.** Its bounded, agent-sized entry point gives agents the repository layout, architectural invariants, commands, conventions, and pointers to deeper docs. Agent-specific files (CLAUDE.md, GEMINI.md, Copilot instructions, etc.) are thin pointers back to AGENTS.md.
-
-**Architecture is enforced mechanically, not by convention.** Layering rules, import boundaries, backend application Python file-size limits, and SDK containment are verified by structural tests and lints that run on every change. When rules are enforceable by code, agents follow them reliably.
-
-**The knowledge base is structured for progressive disclosure:**
-
-```
-AGENTS.md              Single source of truth — layout, invariants, commands, conventions
-ARCHITECTURE.md        System layout, layering rules, data flows
-docs/
-  features/            Feature docs (inputs, outputs, flows, edge cases)
-  app-workflows.md     User journeys
-  dev-workflows.md     Engineering workflows, command index, releases
-  verification.md      What each gate checks, and failure recovery
-  frontend-conventions.md  Frontend conventions and data fetching
-  SECURITY.md          Security principles
-  RELIABILITY.md       Reliability expectations
-  exec-plans/          Execution plans and tech debt tracker
-```
-
-### Key design decisions
-
-| Principle | Implementation |
-|-----------|---------------|
-| Give agents a single source of truth | AGENTS.md — bounded layout, invariants, commands, conventions |
-| Enforce invariants mechanically | Structural tests + ruff + ESLint verify boundaries |
-| DRY documentation | Each fact lives in one place; no redundant files to drift |
-| Strict layered architecture | `types -> config -> repo -> service -> runtime`, enforced by tests |
-| Prefer boring, composable libraries | stdlib logging over frameworks, Pydantic over ad-hoc validation |
-| Contain external SDKs | `boto3` only in `repo/` layer — verified by structural test |
-| Keep files agent-sized | 300-line limit for backend app Python, enforced by test |
-| Docs updated with code | Same-PR requirement prevents documentation rot |
-| Structured observability | JSON logging, `/metrics` endpoint, request tracing |
-
-This approach draws from [OpenAI's experience building with Codex](https://openai.com/index/harness-engineering/): agents work best in environments with strict boundaries, predictable structure, and progressive context disclosure.
+- **S3-compatible API.** Plain `boto3` (`put_object`, `get_object`,
+  `list_objects_v2`, `delete_objects`, presigned URLs), isolated in
+  `services/api/app/repo/`, with a custom user agent on every client.
+- **Archive economics.** Colorization multiplies stored bytes by design, across
+  every model variant you try. B2's pricing is what makes keeping every original
+  and every version affordable.
+- **Free to start.** A [free B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-ddcolor-photo-colorization) runs everything here.
 
 ## Core Features
 
 <!-- gen:begin readme-core-features -->
-- [File Upload](docs/features/file-upload.md) — drag-and-drop upload with real-time progress
-- [File Browser](docs/features/file-browser.md) — list, preview, download, delete files
-- [Dashboard](docs/features/dashboard.md) — stats cards, upload chart, recent uploads
-- [Metadata Extraction](docs/features/metadata-extraction.md) — image dimensions, EXIF, PDF info, checksums
+- [Batches](docs/features/batches.md) — create, edit, delete and run colorization batches with a per-run manifest
+- [Colorization](docs/features/colorization.md) — DDColor runs locally (CUDA, Apple MPS or CPU) and keeps the original resolution
+- [Photo Library](docs/features/photo-library.md) — grayscale originals with before/after views of every colorized version
+- [Bulk Ingest](docs/features/file-upload.md) — drag-and-drop many scans straight to the grayscale prefix by presigned PUT
+- [Dashboard](docs/features/dashboard.md) — photos ingested and colorized, derived bytes and the write-amplification ratio
+- [Bucket Explorer](docs/features/file-browser.md) — browse, preview, download and delete any object in the bucket
 - [Settings](docs/features/settings.md) — theme plus labelled demo preference fields
 <!-- gen:end readme-core-features -->
-- [Design System](docs/design-system.md) — tokens, primitives, AI elements, the blaze generating loader, and inline `ErrorState` / `EmptyState` patterns. Live preview at `/design`.
-- Inline error handling — fetch failures surface *what's wrong* (API offline, 401, 5xx) and offer a Retry, instead of silently rendering empty state.
-- Single-source config — one `.env` at the repo root powers both API and web app, validated at startup so misconfig fails fast with a readable message.
-- Centralized data layer — every fetch goes through TanStack Query hooks in `apps/web/src/lib/queries.ts`; cache invalidation is one call after a mutation. The types, route registry and query keys underneath are generated from the API contract by `pnpm gen:api`, so the client cannot drift from the backend.
-- Checked local API contract — [`docs/api/openapi.json`](docs/api/openapi.json) plus `pnpm contract:check` catch FastAPI/client route drift; it describes the template API you run, not a hosted public endpoint.
-- Structural tests — verify layering rules, import boundaries, SDK containment, and backend application Python file-size limits
-- Structured JSON logging — every request traced with `request_id` and timing
-- `/health` endpoint — B2 connectivity check
-- `/metrics` endpoint — Prometheus-format counters (request count, latency, uploads)
-- `/docs` + `/redoc` — auto-generated interactive API docs (toggle off in prod with `ENABLE_DOCS=false`)
-- Per-IP rate limiting and magic-byte upload validation — see [SECURITY.md](docs/SECURITY.md)
+- [Design System](docs/design-system.md): tokens, primitives and the inline `ErrorState` / `EmptyState` patterns. Live preview at `/design`.
+- Per-run manifest CSV: original and output keys, model id and Hugging Face revision, sizes, dimensions, duration, status and error per photo.
+- Restart-safe runs: a batch left running by a stopped API comes back as `interrupted` and can be re-run; it never sticks at `running`.
+- Centralized data layer: every fetch goes through TanStack Query hooks in `apps/web/src/lib/queries.ts`; types, routes and query keys are generated from the API contract by `pnpm gen:api`.
+- Structural tests: layering, `boto3` only in `repo/`, PyTorch/DDColor only in `repo/ddcolor.py`, and the 300-line limit for backend files.
+- `/health`, Prometheus `/metrics`, structured JSON logs, per-IP rate limiting and magic-byte upload validation; see [SECURITY.md](docs/SECURITY.md).
 
 ## Tech Stack
 
-- TypeScript, Next.js 16, React 19, Tailwind v4, shadcn/ui, Recharts
-- TanStack Query — caching, dedup, retry, stale-while-revalidate for every fetch
-- Python 3.12+, FastAPI, boto3, Pydantic v2, Pillow, PyPDF2
+- TypeScript, Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query, Recharts
+- Python 3.12+, FastAPI, boto3, Pydantic v2, Pillow
+- [DDColor](https://github.com/piddnad/DDColor) (Apache-2.0, ICCV 2023) on PyTorch, weights from the public `piddnad/ddcolor_*` Hugging Face repositories
 - Backblaze B2 (S3-compatible object storage)
 - pnpm workspaces (monorepo)
 
 ## Commands
-
-The commands you reach for day to day:
 
 <!-- gen:begin readme-commands -->
 | Command | What it does |
@@ -247,39 +189,39 @@ The commands you reach for day to day:
 | `pnpm test:verify` | Run throwaway verification specs from `apps/web/e2e/verify/` against the app, with the shared browser fixtures |
 <!-- gen:end readme-commands -->
 
+Sample-specific commands: `pnpm setup:ml` installs the optional DDColor stack,
+and `pnpm seed:demo` ingests the public-domain demo photos (`--dry-run` lists
+their sources and licences without uploading).
+
 `pnpm verify` is the gate to run before opening a PR. It needs
-`services/api/.venv` from `pnpm run setup`, but no B2 credentials or browser, and
-it breaks down into `pnpm verify:api` (backend lint, tests, structure),
-`pnpm verify:web` (frontend lint, unit tests, typecheck + build), and
-`pnpm check:agent-docs` (agent-doc drift).
+`services/api/.venv` from `pnpm run setup`, but no B2 credentials, no browser and
+no ML stack, and it breaks down into `pnpm verify:api` (backend lint, tests,
+structure), `pnpm verify:web` (generator drift, frontend lint, unit tests,
+typecheck + build), and `pnpm check:agent-docs` (agent-doc drift). Real
+colorization is exercised at run time with `pnpm setup:ml`, not inside `verify`.
 
 For the full command reference (`dev:web`, `dev:api`, `lint`, `test:*`,
 `check:structure`, `test:e2e`, live B2 tests), see
-[docs/dev-workflows.md](docs/dev-workflows.md#commands). For worktree/parallel-run
-notes, port-fallback behavior, and slow-run recovery, see
-[docs/verification.md](docs/verification.md).
+[docs/dev-workflows.md](docs/dev-workflows.md#commands). For worktree notes,
+port fallback and slow-run recovery, see [docs/verification.md](docs/verification.md).
 
-## Deploying to Vercel
+## Deploying
 
-Deploys as **one Vercel project** — the Next.js web app and FastAPI API build
-from the same repo and share one origin (web at `/`, API under `/api`), so
-there's **no CORS and no second URL to wire up**.
+The intended use is local (`pnpm dev`), next to the machine that holds the GPU
+or the CPU budget. For a hosted instance, Railway runs the web app and the API as
+two services; the API build installs the ML stack (CPU PyTorch on Linux) and
+colorizes on CPU, or faster on a GPU host. There is deliberately no Vercel
+button: DDColor's PyTorch inference and its 220 to 900 MB weights do not fit in a
+serverless function, so such a deploy could not colorize.
 
 <!-- gen:begin readme-deploy-button -->
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fbackblaze-b2-samples%2Fvibe-coding-starter-kit&project-name=vibe-coding-starter-kit&repository-name=vibe-coding-starter-kit&demo-title=Vibe%20Coding%20Starter%20Kit&demo-description=A%20well-engineered%20full-stack%20foundation%20%E2%80%94%20dashboard%2C%20drag-and-drop%20upload%20and%20a%20file%20browser%20%E2%80%94%20with%20Backblaze%20B2%20storage%20already%20wired%20in%2C%20so%20builders%20skip%20the%20boilerplate%20loop.&demo-image=https%3A%2F%2Fraw.githubusercontent.com%2Fbackblaze-b2-samples%2Fvibe-coding-starter-kit%2Fmain%2Fdocs%2Fimages%2Fb2-starterkit-dashboard1.png&env=B2_APPLICATION_KEY_ID%2CB2_APPLICATION_KEY%2CB2_BUCKET_NAME%2CB2_REGION&envDescription=B2%20credentials%20and%20bucket&envLink=https%3A%2F%2Fgithub.com%2Fbackblaze-b2-samples%2Fvibe-coding-starter-kit%2Fblob%2Fmain%2Finfra%2Fvercel%2FREADME.md)
+_This app does not ship a one-click deploy button._
 <!-- gen:end readme-deploy-button -->
 
-Set your B2 credentials and bucket, and you're live. Uploads go **directly from
-the browser to B2** (presigned PUT), so Vercel's 4.5 MB payload limit doesn't
-apply — you keep the 100 MB default. Two things to know before a real deploy:
-
-- Your bucket's CORS must allow the deploy origin.
-- The deployed API is unauthenticated and bucket-wide — use a dedicated B2
-  bucket/prefix and key for any preview.
-
-Full setup — variable reference, the two-Projects alternative, security,
-preview/production, `/health` checks, and rollback — is in the
-[Vercel delivery contract](infra/vercel/README.md).
+Before a real deploy, the bucket's CORS must allow the web origin (the browser
+uploads straight to B2), and the API is unauthenticated: use a dedicated bucket
+and key. The full contract is in [infra/railway/README.md](infra/railway/README.md).
+Deploying is always a human-approved action.
 
 ## Documentation Map
 
@@ -288,7 +230,7 @@ preview/production, `/health` checks, and rollback — is in the
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Agent table of contents — start here |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System layout, layering, data flows |
-| [docs/features/](docs/features/) | Feature docs (file upload, file browser, dashboard, metadata extraction, settings) |
+| [docs/features/](docs/features/) | Feature docs (batches, colorization, photo library, bulk ingest, dashboard, bucket explorer, settings) |
 | [docs/design-system.md](docs/design-system.md) | Design tokens, primitives, loader, error/empty states |
 | [docs/app-workflows.md](docs/app-workflows.md) | User journeys |
 | [docs/dev-workflows.md](docs/dev-workflows.md) | Engineering workflows, command index, releases |
@@ -297,66 +239,62 @@ preview/production, `/health` checks, and rollback — is in the
 | [docs/SECURITY.md](docs/SECURITY.md) | Security principles |
 | [docs/RELIABILITY.md](docs/RELIABILITY.md) | Reliability expectations |
 | [docs/api/openapi.json](docs/api/openapi.json) | The checked-in API contract the client seam is generated from |
-| [infra/vercel/README.md](infra/vercel/README.md) | Vercel deployment contract |
 | [infra/railway/README.md](infra/railway/README.md) | Railway delivery contract |
 | [docs/exec-plans/](docs/exec-plans/) | Execution plans, tech debt, and the sample manifest |
 <!-- gen:end readme-doc-map -->
 
 ## FAQ
 
-**What is the Vibe Coding Starter Kit?**
-An open-source, full-stack template (Next.js 16 + FastAPI) with a pre-built dashboard UI, drag-and-drop file upload, and file browser, with [Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) cloud storage already integrated. You clone it, connect it to your own B2 bucket, then rebrand and extend it for your app.
+**What does DDColor Photo Colorization do?**
+It bulk-ingests black-and-white scans into a Backblaze B2 bucket, colorizes them in batches with DDColor running locally, and writes the colorized images, optional side-by-side comparisons and a per-run manifest CSV back to B2 next to the untouched originals.
 
-**Is it free?**
-Yes. The code is MIT-licensed (see [License](#license)), and Backblaze B2 offers a free account to get started.
+**Do I need a GPU or an API key?**
+Neither. DDColor auto-detects CUDA, then Apple MPS, then falls back to CPU (`DDCOLOR_DEVICE` overrides it). The weights are public on the Hugging Face Hub, so no token is needed. The only credential is your B2 application key.
+
+**Does colorizing change my originals?**
+No. Originals live under `colorization/grayscale/` and are only ever read. Deleting a batch removes its outputs, comparisons, manifest and record, never the originals.
+
+**What if I upload a colour photo?**
+It is accepted and flagged `was color` in the Photo Library. The pipeline keeps only its luminance, so the output is DDColor's colorization of the grayscale version.
+
+**Which model should I pick?**
+DDColor tiny (ConvNeXt-T) is the default and the fastest on CPU. ModelScope, paper and artistic (ConvNeXt-L, about 900 MB each) trade speed for quality or saturation. A batch's model is fixed; create another batch to compare models, and both versions stay available.
+
+**How big can a scan be?**
+Up to 100 MB per upload and 60 million decoded pixels per photo (`MAX_PHOTO_PIXELS`). Output keeps the original resolution because the colour is recombined with the original luminance.
+
+**Where do the demo photos come from?**
+`pnpm seed:demo` fetches eight public-domain historical photographs from Wikimedia Commons (streets, rail and landscapes). Each one's source page and licence are listed in `services/api/scripts/seed_demo.py`.
 
 **Can I use it in production?**
-It's a template/sample Backblaze maintains to help developers get started with B2. Production use is possible with caution and requires your own validation — you own the product-specific security, operations, capacity, compliance, and support decisions for anything you adapt, and the repository software carries no SLA. See [When not to use](#when-not-to-use) and [Maintenance and support](#maintenance-and-support).
+It is a sample Backblaze maintains to help developers get started with B2. Production use is possible with caution and requires your own validation: add authentication, and you own the security, operations and support decisions. See [When not to use](#when-not-to-use) and [Maintenance and support](#maintenance-and-support).
 
-**Does it include authentication, user accounts, or multi-tenant isolation?**
-No. It does not provide managed hosting, user accounts, authentication, tenant isolation, billing, or on-call operations. Add whatever your application requires on top of the scaffold.
-
-**Do I have to use Backblaze B2?**
-It integrates Backblaze B2 through the S3-compatible API, and B2 is the storage the kit is built around. You supply your own B2 bucket and application key during setup.
-
-**Is it really built for AI coding agents?**
-Yes. [AGENTS.md](AGENTS.md) is the single source of truth for coding agents, architectural boundaries are enforced mechanically by structural tests and lints (not by convention), and the docs use progressive disclosure — so an agent can read the repo and start contributing immediately.
-
-**What's the tech stack?**
-Frontend: TypeScript, Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query. Backend: Python 3.12+, FastAPI, boto3, Pydantic v2. Storage: Backblaze B2 (S3-compatible). See [Tech Stack](#tech-stack).
-
-**How do I rebrand it for my own app?**
-Edit a single file — `apps/web/src/lib/app-config.ts` (`APP_NAME`, `APP_DESCRIPTION`) — and the page title, sidebar, and breadcrumb update everywhere. See [Building Your App](#building-your-app).
-
-**How do I deploy it?**
-It deploys to Vercel as a single project — the web app and FastAPI API build from the same repo and share one origin (web at `/`, API under `/api`), so there's no CORS or second URL to wire up. A Railway path is also documented. Deploying is always a human-approved action — see [Deploying to Vercel](#deploying-to-vercel).
-
-**Does it work on Windows?**
-Local scripts are supported on macOS, Linux, and WSL2. Native Windows is not supported yet — use WSL2 on Windows.
+**Is it built for AI coding agents?**
+Yes. [AGENTS.md](AGENTS.md) is the single source of truth for coding agents, and the architectural boundaries are enforced by structural tests and lints, so an agent can read the repo and extend it safely.
 
 **Where do I get help or report bugs?**
-Report repository defects and feature requests through [GitHub Issues](https://github.com/backblaze-b2-samples/vibe-coding-starter-kit/issues). For B2 account, billing, service, or API help, use [Backblaze Support](https://www.backblaze.com/help).
+Report repository defects and feature requests through [GitHub Issues](https://github.com/backblaze-b2-samples/ddcolor-photo-colorization/issues). For B2 account, billing, service, or API help, use [Backblaze Support](https://www.backblaze.com/help).
 
 ## Maintenance and support
 
-Backblaze maintains this open-source template/sample to help developers get
-started with B2. Production use is possible with caution and requires your own
-validation. Report repository defects and feature requests through
-[GitHub Issues](https://github.com/backblaze-b2-samples/vibe-coding-starter-kit/issues);
+Backblaze maintains this open-source sample to help developers get started with
+B2. Production use is possible with caution and requires your own validation.
+Report repository defects and feature requests through
+[GitHub Issues](https://github.com/backblaze-b2-samples/ddcolor-photo-colorization/issues);
 for B2 account, billing, service, or API help, use
-[Backblaze Support](https://www.backblaze.com/help). This template/sample is
-not covered by the Backblaze service level agreement, and no SLA is provided
-for the repository software; any B2 service or support commitments are governed
+[Backblaze Support](https://www.backblaze.com/help). This sample is not covered
+by the Backblaze service level agreement, and no SLA is provided for the
+repository software; any B2 service or support commitments are governed
 separately by the applicable Backblaze terms and support plan.
 
 ## Contributing
 
-Start with [AGENTS.md](AGENTS.md). It's the map — everything else is discoverable from there. For local commit hooks, follow [the pre-commit workflow](docs/verification.md#pre-commit).
+Start with [AGENTS.md](AGENTS.md). It's the map; everything else is discoverable from there. For local commit hooks, follow [the pre-commit workflow](docs/verification.md#pre-commit).
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details. DDColor is Apache-2.0; the demo photographs are public domain.
 
 ## Related projects
 
-**Claude Agent B2 Skill** — manage Backblaze B2 from your terminal using natural language (list/search, audits, stale or large file detection, security checks, safe cleanup). Repo: [claude-skill-b2-cloud-storage](https://github.com/backblaze-b2-samples/claude-skill-b2-cloud-storage).
+**Claude Agent B2 Skill**: manage Backblaze B2 from your terminal using natural language (list/search, audits, stale or large file detection, security checks, safe cleanup). Repo: [claude-skill-b2-cloud-storage](https://github.com/backblaze-b2-samples/claude-skill-b2-cloud-storage).

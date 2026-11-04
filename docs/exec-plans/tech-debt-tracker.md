@@ -7,6 +7,9 @@ Known tech debt items. Agents update this when they discover or create tech debt
 
 | Description | Impact | Proposed Resolution | Priority |
 |---|---|---|---|
+| Colorize runner queue and batch-record lock are in-process | Two API replicas would each run their own queue and could interleave writes to one record | Keep one API replica; for scale, move the queue to a shared store and make `batch_store.mutate` a conditional write (ETag `If-Match`) | Medium |
+| Photo Library and batch list read every batch record | `list_photos` / `get_stats` scale with the number of batches (records are ETag-cached, but still listed each call) | Maintain a per-original version index object updated by the runner, or paginate batch records | Low |
+| Bucket Explorer deletes do not update batch records | Deleting a colorized output by key leaves its batch item pointing at a missing object (broken gallery tile) | Reject explorer deletes under `colorized/`/`comparisons/`, or mark the owning item on delete | Low |
 | Download counter & `/metrics` not durable across restart/replicas | Counter resets on redeploy (ephemeral FS); both fragment across replicas | Back the counter with a shared store (Redis/DB); label/aggregate metrics per instance. Relocated to `repo/counter.py` and documented in RELIABILITY.md | Medium |
 | Upload buffers the whole file in memory | ~3× file size RAM per upload; large files strain the server (event loop no longer blocked, but memory unbounded) | Stream to a temp file, or S3 multipart above a size threshold | Medium |
 | `GET /files-by-key/detail` re-downloads the whole object to recompute metadata | Rich metadata for stored files costs a full download + in-memory hash per preview; large objects are slow/expensive and buffer in API memory | Persist `FileMetadataDetail` at upload (S3 user-metadata, mind the ~2KB cap, or a sidecar/object store) and serve it without re-downloading; add a size ceiling above which detail is skipped | Medium |

@@ -1,14 +1,22 @@
 import type {
+  Batch,
+  BatchDetail,
+  ColorizationStats,
+  CreateBatchRequest,
   DailyUploadCount,
+  DeleteBatchResponse,
   DeleteFileResponse,
   FileMetadata,
   FileMetadataDetail,
   FileUploadResponse,
   FileUrlResponse,
   HealthStatus,
+  PhotoDetail,
+  PhotoPage,
   PresignUploadResponse,
+  UpdateBatchRequest,
   UploadStats,
-} from "@vibe-coding-starter-kit/shared";
+} from "@ddcolor-photo-colorization/shared";
 
 import { API_CLIENT_ROUTES } from "./generated/api-routes";
 
@@ -24,11 +32,11 @@ import { API_CLIENT_ROUTES } from "./generated/api-routes";
 // `scripts/gen/api-gen.config.json` (`escapeHatch`).
 export { API_CLIENT_ROUTES };
 
-// Single-origin deploys (Vercel `services`: one project serving web + API) put
-// the API under /api on the same origin, so no NEXT_PUBLIC_API_URL is needed —
-// a production build with it unset defaults to the relative "/api". An explicit
-// NEXT_PUBLIC_API_URL still wins (two-project / separate-origin deploys). Local
-// dev (NODE_ENV !== "production") falls back to the dev API port.
+// Separate-origin deploys (Railway: one web service, one API service) set
+// NEXT_PUBLIC_API_URL at build time. A same-origin deploy that mounts the API
+// under /api needs nothing: a production build with it unset defaults to the
+// relative "/api". Local dev (NODE_ENV !== "production") falls back to the dev
+// API port.
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   (process.env.NODE_ENV === "production" ? "/api" : "http://localhost:8000");
@@ -338,4 +346,74 @@ function putFileToStorage(
     }
     xhr.send(file);
   });
+}
+
+// --- Colorization batches and the Photo Library ---------------------------
+
+function batchPath(path: `${string}{batch_id}${string}`, batchId: string): string {
+  if (batchId.length === 0) {
+    throw new ApiError("Batch id is required", 400);
+  }
+  return path.replace("{batch_id}", encodeURIComponent(batchId));
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+export async function getBatches(limit = 50) {
+  return apiFetch<Batch[]>(`${API_CLIENT_ROUTES.batches.path}?limit=${limit}`);
+}
+
+export async function getBatch(batchId: string) {
+  return apiFetch<BatchDetail>(batchPath(API_CLIENT_ROUTES.batch.path, batchId));
+}
+
+export async function getBatchStats() {
+  return apiFetch<ColorizationStats>(API_CLIENT_ROUTES.batchStats.path);
+}
+
+export async function createBatch(body: CreateBatchRequest) {
+  return apiFetch<Batch>(API_CLIENT_ROUTES.batchCreate.path, {
+    method: API_CLIENT_ROUTES.batchCreate.method.toUpperCase(),
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateBatch(batchId: string, body: UpdateBatchRequest) {
+  return apiFetch<Batch>(batchPath(API_CLIENT_ROUTES.batchUpdate.path, batchId), {
+    method: API_CLIENT_ROUTES.batchUpdate.method.toUpperCase(),
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteBatch(batchId: string) {
+  return apiFetch<DeleteBatchResponse>(
+    batchPath(API_CLIENT_ROUTES.batchDelete.path, batchId),
+    { method: API_CLIENT_ROUTES.batchDelete.method.toUpperCase() },
+  );
+}
+
+export async function runBatch(batchId: string) {
+  return apiFetch<Batch>(batchPath(API_CLIENT_ROUTES.batchRun.path, batchId), {
+    method: API_CLIENT_ROUTES.batchRun.method.toUpperCase(),
+  });
+}
+
+export async function getManifestDownloadUrl(batchId: string) {
+  return apiFetch<FileUrlResponse>(
+    batchPath(API_CLIENT_ROUTES.batchManifestDownload.path, batchId),
+  );
+}
+
+export async function getPhotos(limit = 48, cursor?: string) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  return apiFetch<PhotoPage>(`${API_CLIENT_ROUTES.photos.path}?${params}`);
+}
+
+export async function getPhotoDetail(key: string) {
+  return apiFetch<PhotoDetail>(
+    `${API_CLIENT_ROUTES.photoDetail.path}?${fileKeyQuery(key)}`,
+  );
 }

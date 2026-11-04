@@ -8,10 +8,127 @@
 // contract. To change what is here, change the FastAPI route or Pydantic
 // model and re-run `pnpm contract:export && pnpm gen:api`.
 
+/** A colorization run: configuration, status and byte counts. */
+export interface Batch {
+  batch_id: string;
+  created_at: string;
+  /**
+   * Bytes this batch wrote: colorized outputs, comparisons and its
+   * manifest.
+   */
+  derived_bytes: number;
+  description: string | null;
+  done_count: number;
+  failed_count: number;
+  finished_at: string | null;
+  input_size: InputSize;
+  make_comparisons: boolean;
+  manifest_key: string | null;
+  model_id: ModelId;
+  name: string;
+  /** Bytes of the grayscale originals in this batch. */
+  original_bytes: number;
+  output_format: OutputFormat;
+  photo_count: number;
+  started_at: string | null;
+  status: BatchStatus;
+  updated_at: string;
+}
+
+/** A batch plus every item, for the detail page. */
+export interface BatchDetail {
+  batch_id: string;
+  created_at: string;
+  /**
+   * Bytes this batch wrote: colorized outputs, comparisons and its
+   * manifest.
+   */
+  derived_bytes: number;
+  description: string | null;
+  done_count: number;
+  failed_count: number;
+  finished_at: string | null;
+  input_size: InputSize;
+  items: BatchItem[];
+  make_comparisons: boolean;
+  manifest_key: string | null;
+  model_id: ModelId;
+  model_version: string | null;
+  name: string;
+  /** Bytes of the grayscale originals in this batch. */
+  original_bytes: number;
+  output_format: OutputFormat;
+  photo_count: number;
+  started_at: string | null;
+  status: BatchStatus;
+  updated_at: string;
+}
+
+/** One photo in a batch, with short-lived presigned URLs for viewing. */
+export interface BatchItem {
+  colorized_key: string | null;
+  colorized_url: string | null;
+  comparison_key: string | null;
+  comparison_url: string | null;
+  duration_ms: number | null;
+  error: string | null;
+  height: number | null;
+  original_key: string;
+  /** Inline presigned GET for the grayscale original. */
+  original_url: string;
+  status: ItemStatus;
+  width: number | null;
+}
+
+export type BatchStatus = "draft" | "queued" | "running" | "done" | "partial" | "failed" | "interrupted";
+
+/** Dashboard aggregates, headlined by the write-amplification ratio. */
+export interface ColorizationStats {
+  /**
+   * (grayscale_bytes + derived_bytes) / grayscale_bytes: stored bytes per
+   * ingested byte.
+   */
+  amplification_ratio: number;
+  batches_total: number;
+  /**
+   * Colorized outputs + comparison images + manifest CSVs under the app
+   * prefix.
+   */
+  derived_bytes: number;
+  grayscale_bytes: number;
+  photos_colorized: number;
+  photos_ingested: number;
+  recent_batches: Batch[];
+}
+
+/** Create a batch. Defaults mirror the create form's suggested values. */
+export interface CreateBatchRequest {
+  /** Use every original that no batch has colorized yet. */
+  all_unprocessed?: boolean;
+  description?: string | null;
+  input_size?: InputSize;
+  make_comparisons?: boolean;
+  model_id?: ModelId;
+  name: string;
+  output_format?: OutputFormat;
+  run_now?: boolean;
+  /**
+   * Original keys under the grayscale/ prefix. Ignored when
+   * all_unprocessed is true.
+   */
+  source_keys?: string[];
+}
+
 /** One day's upload count, for the dashboard activity chart. */
 export interface DailyUploadCount {
   date: string;
   uploads: number;
+}
+
+/** A deleted batch. Grayscale originals are never deleted. */
+export interface DeleteBatchResponse {
+  batch_id: string;
+  deleted_objects: number;
 }
 
 /** Acknowledgement that one object was removed from the bucket. */
@@ -89,6 +206,11 @@ export interface FileUploadResponse {
   uploaded_at: string;
   /** Public object URL when the bucket is public, else null. */
   url: string | null;
+  /**
+   * Image ingest check: true when the photo is already in colour (it is
+   * desaturated before inference), false for grayscale, null if unchecked.
+   */
+  was_color: boolean | null;
 }
 
 /** A short-lived presigned GET for downloading or previewing one object. */
@@ -116,6 +238,76 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * Square resolution the model predicts colour at (output keeps the
+ * original size).
+ */
+export type InputSize = 256 | 512;
+
+export type ItemStatus = "pending" | "running" | "done" | "failed";
+
+/** DDColor checkpoints published on the Hugging Face Hub (`piddnad/<id>`). */
+export type ModelId = "ddcolor_modelscope" | "ddcolor_paper" | "ddcolor_artistic" | "ddcolor_paper_tiny";
+
+export type OutputFormat = "jpeg" | "png" | "webp";
+
+/** One ingested original and a pointer to its latest colorized version. */
+export interface Photo {
+  /** Inline presigned GET for the latest colorized version. */
+  colorized_url: string | null;
+  colorized_versions: number;
+  filename: string;
+  key: string;
+  last_modified: string;
+  /** Inline presigned GET for the original. */
+  original_url: string;
+  size: number;
+  /**
+   * True when the ingest check found a colour image; it is desaturated
+   * before inference.
+   */
+  was_color: boolean;
+}
+
+export interface PhotoDetail {
+  /** Inline presigned GET for the latest colorized version. */
+  colorized_url: string | null;
+  colorized_versions: number;
+  filename: string;
+  key: string;
+  last_modified: string;
+  /** Inline presigned GET for the original. */
+  original_url: string;
+  size: number;
+  versions: PhotoVersion[];
+  /**
+   * True when the ingest check found a colour image; it is desaturated
+   * before inference.
+   */
+  was_color: boolean;
+}
+
+export interface PhotoPage {
+  items: Photo[];
+  next_cursor: string | null;
+}
+
+/** One colorized version of an original, produced by one batch. */
+export interface PhotoVersion {
+  batch_id: string;
+  batch_name: string;
+  colorized_key: string;
+  colorized_url: string;
+  comparison_key: string | null;
+  comparison_url: string | null;
+  /** Attachment presigned GET for the colorized file. */
+  download_url: string;
+  input_size: InputSize;
+  model_id: ModelId;
+  processed_at: string | null;
+  size: number;
+}
+
 /** What the browser declares before uploading directly to B2. */
 export interface PresignUploadRequest {
   content_type: string;
@@ -139,6 +331,15 @@ export interface PresignUploadResponse {
   key: string;
   method: string;
   url: string;
+}
+
+/**
+ * Only the descriptive fields are editable; the configuration is
+ * immutable.
+ */
+export interface UpdateBatchRequest {
+  description?: string | null;
+  name?: string | null;
 }
 
 /** Aggregate bucket figures behind the dashboard stat cards. */

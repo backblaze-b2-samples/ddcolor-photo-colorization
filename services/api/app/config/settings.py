@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # app-config.ts, so this is the backend's declaration of the same slug:
     # keep it equal to the package name, and derive identifiers from it rather
     # than writing a second name a rename sweep has to know about.
-    app_slug: str = "vibe-coding-starter-kit"
+    app_slug: str = "ddcolor-photo-colorization"
 
     api_port: int = 8000
     # Interactive API docs (/docs, /redoc, /openapi.json). On by default for
@@ -62,11 +62,31 @@ class Settings(BaseSettings):
     # narrow, single-key, single-size window.
     presign_upload_expiry_seconds: int = 900  # 15 minutes
 
-    # Optional confinement for key-addressed reads/deletes. Empty by default so
-    # the by-key routes accept any key shape (they deliberately support nested
-    # folders and reserved-word segments). Point a fork at a bucket shared with
-    # other data? Set to e.g. "uploads/" to restrict all key ops to app uploads.
-    allowed_key_prefix: str = ""
+    # Confinement for key-addressed reads/deletes (preview, download, detail,
+    # delete) in the Bucket Explorer. Defaults to this app's own prefix so a
+    # bucket shared with other data cannot be read or deleted through this app;
+    # the explorer still LISTS the whole bucket. Set ALLOWED_KEY_PREFIX="" to
+    # allow every key.
+    allowed_key_prefix: str = "colorization/"
+
+    # Every object this app writes lives under this one prefix (see the key
+    # layout in ARCHITECTURE.md): grayscale/ originals, colorized/, comparisons/,
+    # manifests/, batches/ records and flags/. The Bucket Explorer still lists
+    # the whole bucket; ALLOWED_KEY_PREFIX (above) confines its by-key ops.
+    colorization_prefix: str = "colorization/"
+    # DDColor inference device: "auto" picks the first available of CUDA, Apple
+    # MPS, then CPU. Force one with cpu | cuda | mps (an unavailable choice falls
+    # back to CPU with a warning rather than failing the batch).
+    ddcolor_device: str = "auto"
+    # Decoded-pixel ceiling per photo. DDColor recombines the predicted colour
+    # with the ORIGINAL-resolution luminance, so memory grows with pixel count;
+    # a photo above this fails its item with a clear error instead of OOMing.
+    max_photo_pixels: int = 60_000_000
+    # TTL for the presigned GET URLs the gallery, Photo Library and CMS jobs use.
+    presign_view_expiry_seconds: int = 3600
+    # Mark batches left queued/running by a previous process as `interrupted`
+    # at startup, so a restart never shows a batch stuck in `running`.
+    recover_batches_on_startup: bool = True
 
     # Full-bucket listing cache (repo/list_cache.py). Both /files and
     # /files/stats need every object, and paginating a 16k-object bucket takes

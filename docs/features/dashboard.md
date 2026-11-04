@@ -1,62 +1,46 @@
-<!-- last_verified: 2026-07-28 -->
+<!-- last_verified: 2026-11-04 -->
 # Feature: Dashboard
 
 ## Purpose
-Provide an at-a-glance overview of file storage usage and recent upload activity.
+Show how much colorization the archive has seen and what it costs in storage, headlined by the write-amplification ratio: stored bytes per ingested byte.
 
 ## Used By
-- UI: `/` page (dashboard home)
-- API: `GET /files/stats`, `GET /files`, `GET /files/stats/activity`
+- UI: `/` (`components/dashboard/colorization-overview.tsx`)
+- API: `GET /batches/stats`
 
 ## Core Functions
-- `apps/web/src/components/dashboard/stats-cards.tsx` — 4 stat cards, plus the on-screen loading notice while the bucket scan runs
-- `apps/web/src/components/dashboard/recent-uploads-table.tsx` — last 10 uploads
-- `apps/web/src/components/dashboard/upload-chart.tsx` — bar chart of uploads per day
-- `apps/web/src/lib/api-client.ts` — `getFileStats()`, `getFiles()`, `getUploadActivity()`
-- `services/api/app/runtime/files.py` — `GET /files/stats` handler
-- `services/api/app/service/files.py` — `get_stats()` business logic
-- `services/api/app/repo/b2_client.py` — `get_upload_stats()` data access
-- `services/api/app/repo/list_cache.py` — the shared bucket listing both `/files/stats` and `/files` read, so the dashboard and the file browser never scan twice
-- `apps/web/src/components/common/loading-notice.tsx` — visible, escalating wait copy
+- `services/api/app/service/photos.py`: `get_stats`, `amplification_ratio`
+- `apps/web/src/lib/queries.ts`: `useBatchStats` (refreshes every 4 s while a recent batch is active)
+- `apps/web/src/lib/batch-labels.ts`: `formatRatio`
 
 ## Canonical Files
-- Dashboard page layout: `apps/web/src/components/dashboard/stats-cards.tsx`
-- Stats service logic: `services/api/app/service/files.py`
+- Dashboard component: `apps/web/src/components/dashboard/colorization-overview.tsx`
 
 ## Inputs
-- None (dashboard loads data automatically)
+- None
 
 ## Outputs
-- `GET /files/stats` → `UploadStats` (total_files, total_size_bytes, total_size_human, uploads_today, total_downloads)
-- `GET /files` (limit 10) → `FileMetadata[]` for recent uploads table (sorted newest-first)
-- `GET /files/stats/activity?days=7` → `DailyUploadCount[]` for chart (server-side aggregation)
+- `ColorizationStats`: `photos_ingested`, `photos_colorized` (originals with at least one `done` version), `batches_total`, `grayscale_bytes`, `derived_bytes` (colorized + comparisons + manifests), `amplification_ratio` = `(grayscale_bytes + derived_bytes) / grayscale_bytes` (0 when nothing is ingested), `recent_batches` (5)
 
 ## Flow
-- Page loads → three parallel API calls (stats, recent files, upload activity), all served from one cached bucket listing
-- Stats needed ~8.3s to replace the skeletons on a 16k-object bucket, so: the API warms that listing at startup and serves it stale-while-revalidate (only the very first scan after boot can block), and the cards state the wait in words while it runs instead of showing four silent placeholders
-- Stats cards display total files, storage used, uploads today, total downloads
-- Upload chart displays server-aggregated daily counts for last 7 days as bar chart after activity data is known
-- Recent uploads table shows last 10 files with filename, size, type, date, status badge. Each filename is a link to `/files?preview=<key>`, which opens that file's preview in the browser — the rows used to be inert text with no role, tabindex or handler, so the "click a file to preview it" gesture `/files` teaches did nothing here
+- One `list_objects_v2` of `colorization/`, summed by sub-prefix, plus the batch records
+- UI: the amplification card, three count cards, a bar chart of grayscale vs derived bytes, and a recent-batches table linking to each batch
 
 ## Edge Cases
-- API unavailable → error states with retry where supported; activity chart does not show a false zero state while loading
-- No files uploaded → empty chart message, empty table message
-- Large file count → stats endpoint paginates through all objects using `ContinuationToken`; the result is cached, so the cost is paid once (at startup) rather than per page view
-- Bucket changed by something other than this app → numbers can lag by up to `LIST_CACHE_TTL_SECONDS` (default 300s). The app's own uploads/deletes invalidate the cache, so they are never stale
+- Empty archive -> ratio shows "-", counts 0, empty recent-batches state
+- Objects deleted through the Bucket Explorer are reflected in the byte sums immediately, while batch counts follow the records
+- Batch records and `flags/` markers are not counted as derived bytes
 
 ## UX States
-- Loading: an on-screen "Loading bucket stats…" notice above the cards (escalating at 4s and 12s), with skeleton placeholders for cards, table, and upload activity chart
-- Empty: "No files uploaded yet" / "No upload data available yet"
-- Loaded: populated cards, chart, table
+- Loading: skeleton values; Error: `ErrorState` with Retry; Empty: "No batches yet"
 
 ## Verification
-- Test files: `services/api/tests/test_upload_activity.py`, `services/api/tests/test_recent_files.py`, `services/api/tests/test_list_cache.py`, `apps/web/src/lib/loading-progress.test.ts`
-- Required cases: stats with files, stats with empty bucket, API error fallback, cached listing reused across stats and listing calls, loading copy escalating at its thresholds
+- Test files: `services/api/tests/test_batches.py::test_rerun_with_another_model_keeps_both_versions` (stats after two batches), `apps/web/src/lib/batch-labels.test.ts`
 - Focused verify command: `pnpm test:api`
 - Default pre-PR verify command: `pnpm verify`
-- Full local verify command: `pnpm verify:full` when the E2E/live prerequisites in [Verification](../verification.md#non-live-verification) are available
-- Pass criteria: focused tests and `pnpm verify` green; explain any skipped `pnpm verify:full` prerequisites
+- Full local verify command: `pnpm verify:full` when E2E/live prerequisites apply
+- Pass criteria: tests green; after the seeded demo batch with comparisons on, the ratio is above 1 (3.4x measured)
 
 ## Related Docs
-- [ARCHITECTURE.md](../../ARCHITECTURE.md)
-- [App Workflows](../app-workflows.md)
+- [Batches](batches.md)
+- [docs/app-workflows.md](../app-workflows.md)

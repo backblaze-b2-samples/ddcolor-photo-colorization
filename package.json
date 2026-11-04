@@ -1,17 +1,19 @@
 {
-  "name": "vibe-coding-starter-kit",
+  "name": "ddcolor-photo-colorization",
   "private": true,
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "setup:ml": "sh services/api/scripts/install_ml.sh",
     "doctor": "node scripts/doctor.mjs",
     "predev": "node scripts/doctor.mjs",
     "dev": "sh scripts/dev.sh",
-    "dev:web": "pnpm --filter @vibe-coding-starter-kit/web dev",
+    "dev:web": "pnpm --filter @ddcolor-photo-colorization/web dev",
     "dev:api": "cd services/api && .venv/bin/uvicorn main:app --reload --port ${API_PORT:-8000}",
-    "build": "pnpm --filter @vibe-coding-starter-kit/web build",
-    "typecheck": "pnpm --filter @vibe-coding-starter-kit/web typecheck",
+    "seed:demo": "cd services/api && .venv/bin/python scripts/seed_demo.py",
+    "build": "pnpm --filter @ddcolor-photo-colorization/web build",
+    "typecheck": "pnpm --filter @ddcolor-photo-colorization/web typecheck",
     "contract:export": "services/api/.venv/bin/python services/api/scripts/export_openapi.py",
-    "contract:check": "services/api/.venv/bin/python services/api/scripts/export_openapi.py --check && pnpm --filter @vibe-coding-starter-kit/web exec vitest run src/lib/api-contract.test.ts",
+    "contract:check": "services/api/.venv/bin/python services/api/scripts/export_openapi.py --check && pnpm --filter @ddcolor-photo-colorization/web exec vitest run src/lib/api-contract.test.ts",
     "gen:api": "node scripts/gen-api.mjs",
     "gen:docs": "node scripts/gen-docs.mjs",
     "gen:check": "node scripts/gen-api.mjs --check && node scripts/gen-docs.mjs --check",
@@ -21,14 +23,14 @@
     "verify:api": "pnpm lint:api && pnpm test:api && pnpm check:structure",
     "verify:web": "pnpm gen:check && pnpm lint && pnpm typecheck && pnpm test:web && pnpm build",
     "verify:full": "pnpm run doctor && pnpm verify && pnpm test:e2e",
-    "lint": "pnpm --filter @vibe-coding-starter-kit/web lint",
+    "lint": "pnpm --filter @ddcolor-photo-colorization/web lint",
     "lint:api": "cd services/api && .venv/bin/ruff check .",
-    "test:web": "pnpm --filter @vibe-coding-starter-kit/web test",
+    "test:web": "pnpm --filter @ddcolor-photo-colorization/web test",
     "test:api": "cd services/api && .venv/bin/python -m pytest",
     "test:live:b2": "cd services/api && .venv/bin/python -m pytest live_tests/test_b2_connectivity.py -m live",
     "check:structure": "cd services/api && .venv/bin/python -m pytest tests/test_structure.py -v",
-    "test:e2e": "pnpm --filter @vibe-coding-starter-kit/web exec playwright test --project=chromium",
-    "test:verify": "pnpm --filter @vibe-coding-starter-kit/web exec playwright test --project=verify"
+    "test:e2e": "pnpm --filter @ddcolor-photo-colorization/web exec playwright test --project=chromium",
+    "test:verify": "pnpm --filter @ddcolor-photo-colorization/web exec playwright test --project=verify"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

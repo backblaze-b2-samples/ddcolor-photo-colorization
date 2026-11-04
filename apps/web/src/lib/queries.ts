@@ -8,7 +8,15 @@ import {
 } from "@tanstack/react-query";
 import {
   ApiError,
+  createBatch,
+  deleteBatch,
   deleteFile,
+  getBatch,
+  getBatches,
+  getBatchStats,
+  getManifestDownloadUrl,
+  getPhotoDetail,
+  getPhotos,
   getDownloadUrl,
   getFileDetail,
   getFiles,
@@ -16,12 +24,19 @@ import {
   getHealth,
   getPreviewUrl,
   getUploadActivity,
+  runBatch,
+  updateBatch,
 } from "@/lib/api-client";
 import type {
+  Batch,
+  BatchDetail,
+  BatchStatus,
+  CreateBatchRequest,
+  UpdateBatchRequest,
   FileMetadata,
   FileMetadataDetail,
   FileUrlResponse,
-} from "@vibe-coding-starter-kit/shared";
+} from "@ddcolor-photo-colorization/shared";
 import { qk } from "@/lib/generated/query-keys";
 
 // Query keys are GENERATED from the API contract (`pnpm gen:api`) and their
@@ -166,5 +181,125 @@ export function useDeleteFile() {
       dropDeletedFileFromCache(qc, fileKey);
       qc.invalidateQueries({ queryKey: qk.all });
     },
+  });
+}
+
+// --- Colorization batches -------------------------------------------------
+
+/** Statuses during which the background worker is still changing a batch. */
+export const ACTIVE_BATCH_STATUSES: readonly BatchStatus[] = ["queued", "running"];
+
+export function isBatchActive(status: BatchStatus | undefined): boolean {
+  return status !== undefined && ACTIVE_BATCH_STATUSES.includes(status);
+}
+
+/** Poll interval while a batch is queued or running; off once it settles. */
+export const BATCH_POLL_MS = 2_000;
+
+/** Detail keys append the id to the generated parent key, so invalidating
+ *  `[...qk.all, "batches"]` reaches lists, stats and every detail. */
+export function batchDetailKey(batchId: string) {
+  return [...qk.batch(), batchId] as const;
+}
+
+export function useBatches(limit = 50) {
+  return useQuery<Batch[], ApiError>({
+    queryKey: qk.batches(limit),
+    queryFn: () => getBatches(limit),
+    // Keep the list live while anything in it is still running.
+    refetchInterval: (query) =>
+      query.state.data?.some((b) => isBatchActive(b.status)) ? BATCH_POLL_MS : false,
+  });
+}
+
+export function useBatch(batchId: string) {
+  return useQuery<BatchDetail, ApiError>({
+    queryKey: batchDetailKey(batchId),
+    queryFn: () => getBatch(batchId),
+    enabled: batchId.length > 0,
+    refetchInterval: (query) =>
+      isBatchActive(query.state.data?.status) ? BATCH_POLL_MS : false,
+    // Presigned gallery URLs last an hour; refetching sooner is wasted signing.
+    staleTime: 30_000,
+  });
+}
+
+export function useBatchStats() {
+  return useQuery({
+    queryKey: qk.batchStats(),
+    queryFn: getBatchStats,
+    refetchInterval: (query) =>
+      query.state.data?.recent_batches.some((b) => isBatchActive(b.status))
+        ? BATCH_POLL_MS * 2
+        : false,
+  });
+}
+
+function invalidateColorization(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: [...qk.all, "batches"] });
+  qc.invalidateQueries({ queryKey: [...qk.all, "photos"] });
+  // Derived objects land in the bucket too, so the explorer and its stats move.
+  qc.invalidateQueries({ queryKey: [...qk.all, "files"] });
+  qc.invalidateQueries({ queryKey: qk.stats() });
+}
+
+export function useCreateBatch() {
+  const qc = useQueryClient();
+  return useMutation<Batch, ApiError, CreateBatchRequest>({
+    mutationFn: createBatch,
+    onSuccess: () => invalidateColorization(qc),
+  });
+}
+
+export function useUpdateBatch(batchId: string) {
+  const qc = useQueryClient();
+  return useMutation<Batch, ApiError, UpdateBatchRequest>({
+    mutationFn: (body) => updateBatch(batchId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...qk.all, "batches"] }),
+  });
+}
+
+export function useDeleteBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) => deleteBatch(batchId),
+    onSuccess: (_data, batchId) => {
+      qc.removeQueries({ queryKey: batchDetailKey(batchId) });
+      invalidateColorization(qc);
+    },
+  });
+}
+
+export function useRunBatch() {
+  const qc = useQueryClient();
+  return useMutation<Batch, ApiError, string>({
+    mutationFn: runBatch,
+    onSuccess: () => invalidateColorization(qc),
+  });
+}
+
+/** A mutation, like file downloads: a fresh presigned URL per click, never cached. */
+export function useManifestDownload() {
+  return useMutation<FileUrlResponse, ApiError, string>({
+    mutationFn: getManifestDownloadUrl,
+  });
+}
+
+// --- Photo Library ----------------------------------------------------------
+
+export function usePhotos(limit = 48, cursor?: string) {
+  return useQuery({
+    queryKey: qk.photos(limit, cursor),
+    queryFn: () => getPhotos(limit, cursor),
+    staleTime: 30_000,
+  });
+}
+
+export function usePhotoDetail(key: string | undefined) {
+  return useQuery({
+    queryKey: qk.photoDetail(key ?? ""),
+    queryFn: () => getPhotoDetail(key as string),
+    enabled: !!key,
+    staleTime: 30_000,
   });
 }

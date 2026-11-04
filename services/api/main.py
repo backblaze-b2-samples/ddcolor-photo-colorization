@@ -4,6 +4,7 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Thread
 
 from dotenv import load_dotenv
 
@@ -27,7 +28,8 @@ from app.config import (  # noqa: E402
     REQUIRED_B2_SETTINGS,
     settings,
 )
-from app.runtime import files, health, metrics, ratelimit, upload  # noqa: E402
+from app.runtime import batches, files, health, metrics, photos, ratelimit, upload  # noqa: E402
+from app.service.colorize_runner import recover_interrupted  # noqa: E402
 from app.service.files import warm_listing_cache  # noqa: E402
 
 # --- Startup validation ---
@@ -74,7 +76,18 @@ async def lifespan(_app: "FastAPI"):
     # view reads a warm cache instead of watching skeletons.
     if settings.warm_list_cache_on_startup:
         warm_listing_cache()
+    # A batch left queued/running by a previous process becomes `interrupted`
+    # (re-runnable) instead of looking stuck forever. Off the startup path.
+    if settings.recover_batches_on_startup:
+        Thread(target=_recover_batches, name="batch-recovery", daemon=True).start()
     yield
+
+
+def _recover_batches() -> None:
+    try:
+        recover_interrupted()
+    except Exception:
+        logging.getLogger("api").warning("Batch recovery at startup failed", exc_info=True)
 
 # --- Structured JSON logging ---
 
@@ -107,11 +120,13 @@ logger = logging.getLogger("api")
 
 # --- App setup ---
 
-API_TITLE = "Vibe Coding Starter Kit API"
+API_TITLE = "DDColor Photo Colorization API"
 API_DESCRIPTION = (
-    "Local API for the Vibe Coding Starter Kit template, providing file upload "
-    "and management backed by Backblaze B2. This contract documents the "
-    "template's local API, not a hosted public endpoint."
+    "Local API for DDColor Photo Colorization: bulk-ingest black-and-white "
+    "scans to Backblaze B2, colorize them in batches with DDColor running "
+    "locally, and serve originals, colorized outputs, comparisons and per-run "
+    "manifests from B2. This contract documents the sample's local API, not a "
+    "hosted public endpoint."
 )
 API_VERSION = "0.1.0"
 
@@ -159,11 +174,13 @@ app.add_middleware(
     # reflect an attacker's origin *with* credentials. Flip to True only when
     # you add cookie-based auth AND have tightened the origin allowlist.
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(health.router, tags=["health"])
 app.include_router(upload.router, tags=["upload"])
 app.include_router(files.router, tags=["files"])
+app.include_router(batches.router, tags=["batches"])
+app.include_router(photos.router, tags=["photos"])
 app.include_router(metrics.router, tags=["metrics"])

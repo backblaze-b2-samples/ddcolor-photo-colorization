@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-09-09 -->
+<!-- last_verified: 2026-11-04 -->
 # Dev Workflows
 
 Engineering workflows for this repo: the command index, the per-task checklists,
@@ -12,6 +12,8 @@ and the release process. Two companion docs carry the reference material:
 ## Commands
 - Agent docs health: `pnpm check:agent-docs`
 - Cold-start setup: `pnpm run setup`
+- Optional ML stack (PyTorch + DDColor, needed to colorize): `pnpm setup:ml`
+- Seed the Photo Library with 8 public-domain photos: `pnpm seed:demo` (`--dry-run` lists sources and licences)
 - Preflight environment check: `pnpm run doctor`
 - Wait for the running stack: `pnpm wait-ready`
 - API contract export: `pnpm contract:export`
@@ -29,11 +31,30 @@ and the release process. Two companion docs carry the reference material:
 - Frontend typecheck: `pnpm typecheck`
 - Frontend lint: `pnpm lint`
 - Backend lint: `pnpm lint:api`
-- E2E: `pnpm test:e2e` (run `pnpm --filter @vibe-coding-starter-kit/web exec playwright install chromium` once first)
+- E2E: `pnpm test:e2e` (run `pnpm --filter @ddcolor-photo-colorization/web exec playwright install chromium` once first)
 - App verification specs: `pnpm test:verify` (specs in the gitignored `apps/web/e2e/verify/`)
 
 What each gate checks, its prerequisites, and how to recover when one fails:
 [verification.md](verification.md).
+
+### Optional ML install
+
+Colorization needs PyTorch and DDColor, which are deliberately **not** in
+`services/api/requirements.lock`: the core API, `pnpm verify` and CI run without
+them. Install them into the same venv with:
+
+```bash
+pnpm setup:ml   # = sh services/api/scripts/install_ml.sh
+```
+
+The script runs `pip install -r services/api/requirements-ml.txt` (pinned
+windows with upper bounds), then installs DDColor from GitHub pinned to a commit
+with `--no-deps --no-build-isolation` (its `setup.py` imports torch and pins a
+numpy with no Python 3.12 wheel). On Linux it uses CPU torch wheels unless
+`TORCH_INDEX_URL` names a CUDA index. Without the stack, running a batch returns
+503 with this command. To prove a change to `requirements-ml.txt`, recreate the
+venv (`rm -rf services/api/.venv && pnpm run setup && pnpm setup:ml`) and run a
+real batch; a hand-patched venv hides missing pins.
 
 ## New Feature
 

@@ -2,20 +2,24 @@
 
 ## Users
 
-AI coding agents and "vibe coders" (developers who lean on AI to move fast) who clone
-this kit as the foundation for a new full-stack app. Their context: they want to skip
-the boilerplate loop (dashboard, upload, file browser, cloud storage wiring) and go
-straight to building their app's unique features. They read the repo, keep the shared
-scaffolding, and rebrand + rewrite the dashboard for their own use case.
+Archive engineers and digital-collections teams at newspapers, libraries and
+historical societies who hold large sets of black-and-white scans and want a
+self-hosted, reproducible colorization workflow, plus the developers and AI
+coding agents who adapt this sample for them. Their context: originals are
+irreplaceable, so they must never be touched; every derived image has to be
+traceable to the model and settings that made it; and editors or a CMS need to
+pull results by URL without a second storage system.
 
 ## Product Purpose
 
-An engineering-grade full-stack starter kit (Next.js 16 + React 19 + Tailwind v4 +
-shadcn/ui frontend, FastAPI backend) with Backblaze B2 cloud storage integrated out of
-the box. It ships a dashboard, drag-and-drop upload, and a file browser so builders
-start from a working app, not a blank page. Success = a builder can clone it, run it,
-rebrand it via one config file, and trust every screen enough to build on top without
-first fixing it.
+A batch colorization pipeline with Backblaze B2 as the only store. Scans are
+bulk-ingested to a `grayscale/` prefix, DDColor runs locally over each one and
+produces a full-colour reconstruction at the original resolution, and the
+outputs, optional side-by-side comparisons and a per-run manifest CSV are
+written back next to the untouched originals. Success = an archivist can ingest
+a box of scans, run a batch with the default settings, review every result
+before/after, hand the manifest to a CMS job, and later re-run with another
+model while both versions stay available.
 
 ## Maturity and Support Boundary
 
@@ -29,8 +33,9 @@ and no SLA is provided for the repository software.
 
 ## Brand Personality
 
-Confident, precise, quietly professional. Voice is direct and free of hype ("Stop
-wiring boilerplate and start building"). The interface should feel like a modern
+Confident, precise, quietly professional, with an archivist's care for provenance.
+Voice is direct and free of hype; colorization is presented as a model's estimate,
+never as historical fact. The interface should feel like a modern
 developer tool — considered, calm, trustworthy — not a marketing showpiece. It is a
 **neutral foundation** that others rebrand: the design carries craft through restraint,
 not through a strong opinionated identity of its own.
@@ -39,7 +44,7 @@ not through a strong opinionated identity of its own.
 
 - **Generic AI/SaaS slop.** No gradient text, hero-metric templates, identical
   icon-card grids, tracked uppercase eyebrows, or decorative glassmorphism. These are
-  the exact 2026 AI tells this kit exists to help builders avoid.
+  the exact 2026 AI tells a sample should help builders avoid.
 - **Over-branded / loud.** No heavy brand-color drenching, decorative motion, or flashy
   effects. It is scaffolding to be rebranded, not a hero page.
 - **Toy / prototype feel.** No missing states, inconsistent components, or placeholder
@@ -49,7 +54,7 @@ not through a strong opinionated identity of its own.
 
 ## Design Principles
 
-- **Practice what you preach.** The kit itself must model the engineering quality it
+- **Practice what you preach.** The sample itself must model the engineering quality it
   asks agents to produce. Slop here propagates into every project built on it.
 - **Neutral foundation, easy to rebrand.** Identity lives in tokens (`globals.css`) and
   one config file. Screens are built from the shared UI kit so a rebrand is a token

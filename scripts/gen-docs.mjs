@@ -515,7 +515,13 @@ function main() {
   // that wrote as it went would leave the tree half-updated when a later file
   // failed its size guard — which is the kind of quiet mess this whole change
   // exists to remove.
-  const plan = MODULES.map((module) => {
+  // A runbook belongs to one deployment target; a sample that does not ship
+  // that target has no runbook to fill, so skip it rather than fail on the
+  // missing file.
+  const modules = MODULES.filter(
+    (module) => !module.target || manifest.deployment_targets.includes(module.target),
+  );
+  const plan = modules.map((module) => {
     const { text, changed } = applyRegions(module.file, module.regions, context);
     guardSize(module.file, text);
     return { file: module.file, text, changed };

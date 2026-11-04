@@ -45,9 +45,15 @@ async def test_key_inside_allowed_prefix_allowed(client, monkeypatch):
     assert resp.json()["key"] == "uploads/a.txt"
 
 
+def test_shipped_default_confines_to_the_app_prefix():
+    from app.config.settings import Settings
+
+    assert Settings.model_fields["allowed_key_prefix"].default == "colorization/"
+
+
 @pytest.mark.asyncio
-async def test_arbitrary_key_allowed_by_default(client, monkeypatch):
-    # Default (empty prefix) preserves the by-key routes' arbitrary-key support.
+async def test_arbitrary_key_allowed_when_unconfined(client, monkeypatch):
+    # ALLOWED_KEY_PREFIX="" restores the by-key routes' arbitrary-key support.
     monkeypatch.setattr(files_service, "get_file_metadata", _fake_metadata)
 
     resp = await client.get(
