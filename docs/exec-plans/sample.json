@@ -1,0 +1,160 @@
+{
+  "$schema": "../../scripts/gen/sample.schema.json",
+  "schema_version": 1,
+  "name": "DDColor Photo Colorization",
+  "slug": "ddcolor-photo-colorization",
+  "package_scope": "@ddcolor-photo-colorization",
+  "purpose": "A batch photo colorization pipeline that bulk-ingests black-and-white scans to Backblaze B2, runs DDColor locally to produce full-color reconstructions at original resolution, and writes colorized outputs, side-by-side comparisons and a per-run manifest CSV back to B2 next to the untouched originals, so archives keep provenance and editorial teams can serve results through presigned URLs.",
+  "tagline": "Colorize black-and-white photo archives with DDColor and keep every original and output in Backblaze B2.",
+  "primary_entity": {
+    "schema": "Batch",
+    "singular": "batch",
+    "plural": "batches"
+  },
+  "features": [
+    {
+      "title": "Batches",
+      "route": "/batches",
+      "doc": "docs/features/batches.md",
+      "summary": "create, edit, delete and run colorization batches with a per-run manifest",
+      "workflow_heading": "Run a Colorization Batch"
+    },
+    {
+      "title": "Colorization",
+      "route": null,
+      "doc": "docs/features/colorization.md",
+      "summary": "DDColor runs locally (CUDA, Apple MPS or CPU) and keeps the original resolution"
+    },
+    {
+      "title": "Photo Library",
+      "route": "/photos",
+      "doc": "docs/features/photo-library.md",
+      "summary": "grayscale originals with before/after views of every colorized version",
+      "workflow_heading": "Browse Originals and Colorized Versions"
+    },
+    {
+      "title": "Bulk Ingest",
+      "route": "/upload",
+      "doc": "docs/features/file-upload.md",
+      "summary": "drag-and-drop many scans straight to the grayscale prefix by presigned PUT",
+      "workflow_heading": "Ingest Photos"
+    },
+    {
+      "title": "Dashboard",
+      "route": "/",
+      "doc": "docs/features/dashboard.md",
+      "summary": "photos ingested and colorized, derived bytes and the write-amplification ratio",
+      "workflow_heading": "View Dashboard"
+    },
+    {
+      "title": "Bucket Explorer",
+      "route": "/files",
+      "doc": "docs/features/file-browser.md",
+      "summary": "browse, preview, download and delete any object in the bucket",
+      "workflow_heading": "Browse the Bucket"
+    },
+    {
+      "title": "Settings",
+      "route": "/settings",
+      "doc": "docs/features/settings.md",
+      "summary": "theme plus labelled demo preference fields",
+      "workflow_heading": "Change Preferences"
+    }
+  ],
+  "b2_surface": [
+    {
+      "operation": "presigned PUT",
+      "why": "the browser bulk-ingests originals straight to the grayscale prefix"
+    },
+    {
+      "operation": "head_object",
+      "why": "verify an ingested upload, read per-key size, and the /health connectivity probe"
+    },
+    {
+      "operation": "get_object",
+      "why": "read an original for inference and read batch records"
+    },
+    {
+      "operation": "put_object",
+      "why": "write colorized outputs, comparison images, manifest CSVs and batch records"
+    },
+    {
+      "operation": "list_objects_v2",
+      "why": "the Photo Library, batch list, dashboard aggregates and the full-bucket explorer"
+    },
+    {
+      "operation": "presigned GET",
+      "why": "serve originals, colorized images, comparisons and manifests to viewers and CMS import jobs"
+    },
+    {
+      "operation": "delete_objects",
+      "why": "remove a batch's derived objects while keeping the originals, and Bucket Explorer deletes"
+    }
+  ],
+  "b2_key_prefix": "colorization/",
+  "stack": {
+    "web": "Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query, Recharts",
+    "api": "FastAPI, Python 3.12+, boto3, Pydantic v2, Pillow, DDColor (PyTorch, optional ML extra)",
+    "storage": "Backblaze B2 (S3-compatible API)",
+    "package_manager": "pnpm workspaces"
+  },
+  "deployment_targets": [
+    "railway"
+  ],
+  "env_vars": [
+    {
+      "name": "B2_APPLICATION_KEY_ID",
+      "required": true,
+      "secret": true,
+      "note": "B2 application key ID (**keyID** in the B2 console)"
+    },
+    {
+      "name": "B2_APPLICATION_KEY",
+      "required": true,
+      "secret": true,
+      "note": "B2 application key (**applicationKey**), shown once at creation"
+    },
+    {
+      "name": "B2_BUCKET_NAME",
+      "required": true,
+      "secret": false,
+      "note": "bucket unique name (**Bucket Unique Name** in the B2 console)"
+    },
+    {
+      "name": "B2_REGION",
+      "required": true,
+      "secret": false,
+      "note": "the region inside the bucket's **Endpoint** (`s3.<region>.backblazeb2.com`); the S3 endpoint is derived from it"
+    },
+    {
+      "name": "B2_PUBLIC_URL_BASE",
+      "required": false,
+      "secret": false,
+      "note": "public object base URL, when the bucket is public"
+    },
+    {
+      "name": "NEXT_PUBLIC_API_URL",
+      "required": false,
+      "secret": false,
+      "note": "separate-origin deploys only; Next.js inlines it at build time"
+    },
+    {
+      "name": "DDCOLOR_DEVICE",
+      "required": false,
+      "secret": false,
+      "note": "inference device: `auto` (default, CUDA then Apple MPS then CPU), `cpu`, `cuda` or `mps`"
+    },
+    {
+      "name": "HF_HOME",
+      "required": false,
+      "secret": false,
+      "note": "cache directory for the DDColor weights downloaded from the Hugging Face Hub (no token needed)"
+    }
+  ],
+  "attribution_token": "b2ai-ddcolor-photo-colorization",
+  "repo": {
+    "org": "backblaze-b2-samples",
+    "name": "ddcolor-photo-colorization"
+  },
+  "screenshots": []
+}
