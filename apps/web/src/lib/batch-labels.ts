@@ -146,6 +146,10 @@ export function queuedStageText(
   const label = model?.label ?? batch.model_id;
   if (batch.stage === "downloading_model") {
     const mb = Math.round((batch.model_download_bytes ?? 0) / 1e6);
+    if (mb === 0) {
+      const size = model ? ` (about ${Math.round(model.approxBytes / 1e6)} MB, first use only)` : "";
+      return `Starting the ${label} download from the Hugging Face Hub${size}...`;
+    }
     const total = model ? ` of about ${Math.round(model.approxBytes / 1e6)} MB` : "";
     return `Downloading ${label} weights from the Hugging Face Hub: ${mb} MB${total}. First use only.`;
   }
@@ -165,7 +169,9 @@ export function modelDownloadPercent(
   if (batch.status !== "queued" || batch.stage !== "downloading_model") return null;
   const model = MODEL_OPTIONS.find((m) => m.value === batch.model_id);
   if (!model) return null;
-  const pct = Math.round(((batch.model_download_bytes ?? 0) / model.approxBytes) * 100);
+  // No bytes yet: the download is starting, so the page shows an indeterminate bar.
+  if (!batch.model_download_bytes) return null;
+  const pct = Math.round((batch.model_download_bytes / model.approxBytes) * 100);
   return Math.min(99, Math.max(0, pct));
 }
 

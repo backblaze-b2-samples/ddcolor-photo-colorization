@@ -43,6 +43,7 @@ import { SegmentedControl } from "@/components/common/segmented-control";
 import {
   INPUT_SIZE_OPTIONS,
   MODEL_OPTIONS,
+  modelLabel,
   OUTPUT_FORMAT_OPTIONS,
 } from "@/lib/batch-labels";
 import { useCreateBatch, usePhotos } from "@/lib/queries";
@@ -74,13 +75,19 @@ const schema = z
 
 type Values = z.infer<typeof schema>;
 
+/** "<base> (<model label>)": the suggested name for a re-run with another model. */
+function suggestedName(nameBase: string, model: Values["model_id"]): string {
+  return `${nameBase} (${modelLabel(model)})`.slice(0, 120);
+}
+
 function defaults(presetKeys: string[], preset: BatchPreset = {}): Values {
+  const model_id = preset.model_id ?? "ddcolor_artistic";
   return {
-    name: preset.name ?? "",
+    name: preset.nameBase ? suggestedName(preset.nameBase, model_id) : (preset.name ?? ""),
     description: "",
     source: presetKeys.length > 0 ? "choose" : "all",
     sourceKeys: presetKeys,
-    model_id: preset.model_id ?? "ddcolor_artistic",
+    model_id,
     input_size: preset.input_size ?? 512,
     output_format: preset.output_format ?? "jpeg",
     make_comparisons: preset.make_comparisons ?? true,
@@ -91,7 +98,10 @@ function defaults(presetKeys: string[], preset: BatchPreset = {}): Values {
 /** Pre-filled settings, e.g. "Colorize again with another model" from a batch. */
 export type BatchPreset = Partial<
   Pick<Values, "name" | "model_id" | "input_size" | "output_format" | "make_comparisons">
->;
+> & {
+  /** Source batch name; the suggested name follows the model until the user edits it. */
+  nameBase?: string;
+};
 
 interface CreateBatchDialogProps {
   trigger: ReactNode;
@@ -110,6 +120,16 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
   });
   const source = useWatch({ control: form.control, name: "source" });
   const photos = usePhotos(200, undefined);
+  const modelId = useWatch({ control: form.control, name: "model_id" });
+  const nameEdited = form.formState.dirtyFields.name === true;
+  const nameBase = preset?.nameBase;
+
+  // Keep the suggested name in step with the chosen model, until the user types their own.
+  useEffect(() => {
+    if (!nameBase || nameEdited) return;
+    form.setValue("name", suggestedName(nameBase, modelId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelId, nameBase, nameEdited]);
 
   // Re-seed whenever the dialog opens, so a fresh Photo Library selection lands.
   useEffect(() => {

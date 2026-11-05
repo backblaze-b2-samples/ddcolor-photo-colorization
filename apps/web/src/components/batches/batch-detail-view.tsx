@@ -189,7 +189,7 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
             <CreateBatchDialog
               presetKeys={batch.items.map((i) => i.original_key)}
               preset={{
-                name: `${batch.name} (${modelLabel(another)})`.slice(0, 120),
+                nameBase: batch.name,
                 model_id: another,
                 input_size: batch.input_size,
                 output_format: batch.output_format,
@@ -246,6 +246,14 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
                 aria-label="Model download progress"
                 aria-valuenow={downloadPercent}
                 aria-valuetext={`${Math.round((batch.model_download_bytes ?? 0) / 1e6)} MB downloaded`}
+                data-state="loading"
+              />
+            ) : batch.status === "queued" && batch.stage === "downloading_model" ? (
+              <Progress
+                value={35}
+                className="animate-pulse"
+                aria-label="Model download starting"
+                aria-valuetext="Download starting"
                 data-state="loading"
               />
             ) : (

@@ -117,6 +117,14 @@ def _import_stack() -> tuple[Any, Any, Any, Any]:
         from huggingface_hub import PyTorchModelHubMixin, snapshot_download
     except ImportError as e:
         raise EngineUnavailableError(f"{INSTALL_HINT} ({e})") from e
+    # huggingface_hub reads HF_HUB_DISABLE_XET once, at import. If it was already
+    # imported (by timm or another library) before the setdefault above, the
+    # variable came too late and Xet's off-disk, bursty writes make the bytes read
+    # 0 for the first seconds. Apply the same decision to the loaded constants.
+    from huggingface_hub import constants as hf_constants
+
+    if os.getenv("HF_HUB_DISABLE_XET", "").strip().lower() in ("1", "true", "yes", "on"):
+        hf_constants.HF_HUB_DISABLE_XET = True
 
     class DDColorHF(DDColor, PyTorchModelHubMixin):
         """DDColor with Hugging Face Hub loading, as the upstream README defines it."""
@@ -129,14 +137,20 @@ def _import_stack() -> tuple[Any, Any, Any, Any]:
     return torch, ColorizationPipeline, DDColorHF, snapshot_download
 
 
+def blob_bytes(blobs: Path) -> int:
+    """Bytes in a Hub `blobs/` directory; `*.incomplete` partial downloads count."""
+    if not blobs.is_dir():
+        return 0
+    return sum(f.stat().st_size for f in blobs.iterdir() if f.is_file())
+
+
 def _cache_bytes(repo_id: str) -> int:
     """Bytes of `repo_id` in the local Hub cache, partial (.incomplete) files included."""
     from huggingface_hub import constants
 
-    blobs = Path(constants.HF_HUB_CACHE) / f"models--{repo_id.replace('/', '--')}" / "blobs"
-    if not blobs.is_dir():
-        return 0
-    return sum(f.stat().st_size for f in blobs.iterdir() if f.is_file())
+    return blob_bytes(
+        Path(constants.HF_HUB_CACHE) / f"models--{repo_id.replace('/', '--')}" / "blobs"
+    )
 
 
 def _cached_snapshot(snapshot_download: Any, repo_id: str) -> str | None:

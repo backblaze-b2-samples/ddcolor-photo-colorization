@@ -192,7 +192,7 @@ and the API is meant to run on a trusted machine or a private deployment.
 
 Sample-specific commands: `pnpm setup:ml` installs the optional DDColor stack,
 and `pnpm seed:demo` ingests the public-domain demo photos (`--dry-run` lists
-their sources and licences without uploading).
+their sources, authors and licences without uploading).
 
 `pnpm verify` is the gate to run before opening a PR. It needs
 `services/api/.venv` from `pnpm run setup`, but no B2 credentials, no browser and
@@ -265,7 +265,18 @@ DDColor artistic (ConvNeXt-L, about 900 MB) is the default and often gives the m
 Up to 100 MB per upload and 60 million decoded pixels per photo (`MAX_PHOTO_PIXELS`). Output keeps the original resolution because the colour is recombined with the original luminance.
 
 **Where do the demo photos come from?**
-`pnpm seed:demo` fetches eight public-domain historical photographs from Wikimedia Commons (streets, rail and landscapes). Each one's source page and licence are listed in `services/api/scripts/seed_demo.py`.
+`pnpm seed:demo` fetches eight public-domain historical photographs from Wikimedia Commons (streets, rail and landscapes). Each photo has its own author and licence, read from its Commons page on 2026-11-05 (every one is tagged "Public domain") and stored as S3 user metadata on the uploaded object. The same list lives in `services/api/scripts/seed_demo.py`.
+
+| Photo | Author | Licence | Source |
+| --- | --- | --- | --- |
+| Arundel station and train (1910) | Unknown contract photographer for the picture postcard publisher | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:Arundel_station_and_train.jpg) |
+| Canadian Pacific 5121, Burnaby (1944) | Andy Morin | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:Canadian_Pacific_5121_Burnaby,_British_Columbia_1944.jpg) |
+| Hanoi, French Indochina (c. 1940) | Unknown author, shot before 1945 | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:Hanoi,_French_Indochina_ca._1940.jpg) |
+| McDonald Lake, Glacier National Park (1941) | Ansel Adams | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:McDonald_Lake,_Glacier_National_Park_19.jpg) |
+| Vernal Fall (1858) | Carleton Watkins | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:Watkin_-_Vernal_Fall.jpg) |
+| Spring Showers, New York (1900) | Alfred Stieglitz (named in the Commons file title; its Artist field is empty) | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:Alfred_Stieglitz_-_Spring_Showers,_New_York_-_Cleveland_Museum_of_Art.jpg) |
+| View from Round Top (1873-1883) | Carleton Watkins | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:43._View_from_Round_Top.jpg) |
+| Avenida Maipu level crossing, Olivos (1954) | Unknown | Public domain | [Commons](https://commons.wikimedia.org/wiki/File:Av_maipu_pasonivel_olivos_1954.jpg) |
 
 **Can I use it in production?**
 It is a sample Backblaze maintains to help developers get started with B2. Production use is possible with caution and requires your own validation: add authentication, and you own the security, operations and support decisions. See [When not to use](#when-not-to-use) and [Maintenance and support](#maintenance-and-support).

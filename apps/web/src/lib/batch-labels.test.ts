@@ -93,7 +93,10 @@ describe("batch labels", () => {
     ).toBe(50);
     expect(
       modelDownloadPercent({ ...base, stage: "downloading_model", model_download_bytes: null }),
-    ).toBe(0);
+    ).toBeNull();
+    expect(
+      modelDownloadPercent({ ...base, stage: "downloading_model", model_download_bytes: 0 }),
+    ).toBeNull();
     expect(
       modelDownloadPercent({ ...base, stage: "downloading_model", model_download_bytes: 2e9 }),
     ).toBe(99);

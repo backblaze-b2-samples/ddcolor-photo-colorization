@@ -16,12 +16,22 @@ from app.repo.list_cache import invalidate as _invalidate_list_cache
 _DELETE_CHUNK = 1000
 
 
-def put_object_bytes(key: str, data: bytes, content_type: str) -> int:
-    """Write `data` to `key`. Returns the byte count. Raises RuntimeError on failure."""
+def put_object_bytes(
+    key: str, data: bytes, content_type: str, metadata: dict[str, str] | None = None
+) -> int:
+    """Write `data` to `key`. Returns the byte count. Raises RuntimeError on failure.
+
+    `metadata` becomes S3 user metadata (`x-amz-meta-*`); values must be ASCII.
+    """
     client = get_s3_client()
+    extra = {"Metadata": metadata} if metadata else {}
     try:
         client.put_object(
-            Bucket=settings.b2_bucket_name, Key=key, Body=data, ContentType=content_type
+            Bucket=settings.b2_bucket_name,
+            Key=key,
+            Body=data,
+            ContentType=content_type,
+            **extra,
         )
     except (ClientError, BotoCoreError) as e:
         raise RuntimeError(f"B2 put_object failed for '{key}': {e}") from e

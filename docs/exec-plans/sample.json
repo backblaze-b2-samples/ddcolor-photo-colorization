@@ -155,6 +155,18 @@
       "required": false,
       "secret": false,
       "note": "seconds without new bytes before a first-use Hugging Face weight download fails its batch (default `120`)"
+    },
+    {
+      "name": "MAX_PHOTO_PIXELS",
+      "required": false,
+      "secret": false,
+      "note": "largest photo accepted, in decoded pixels; a bigger one fails its item (default `60000000`)"
+    },
+    {
+      "name": "PRESIGN_VIEW_EXPIRY_SECONDS",
+      "required": false,
+      "secret": false,
+      "note": "lifetime of the presigned image URLs the gallery and Photo Library use (default `3600`)"
     }
   ],
   "attribution_token": "b2ai-ddcolor-photo-colorization",
