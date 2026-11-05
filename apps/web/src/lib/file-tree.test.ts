@@ -40,6 +40,23 @@ describe("buildFileTree", () => {
     expect((uploads.children[0] as TreeFolder).name).toBe("photos");
   });
 
+  it("lists batch folders newest first, after plain folders", () => {
+    const tree = buildFileTree([
+      file("colorized/b-20261101-090000-aaaaaa/x.jpg", "2026-11-01T00:00:00Z"),
+      file("colorized/b-20261104-101500-bbbbbb/x.jpg", "2026-11-04T00:00:00Z"),
+      file("colorized/b-20261102-120000-cccccc/x.jpg", "2026-11-02T00:00:00Z"),
+      file("colorized/misc/x.jpg", "2026-10-01T00:00:00Z"),
+    ]);
+
+    const colorized = tree[0] as TreeFolder;
+    expect(colorized.children.map((c) => (c as TreeFolder).name)).toEqual([
+      "misc",
+      "b-20261104-101500-bbbbbb",
+      "b-20261102-120000-cccccc",
+      "b-20261101-090000-aaaaaa",
+    ]);
+  });
+
   it("sorts files newest-first within a folder", () => {
     const tree = buildFileTree([
       file("uploads/old.txt", "2026-01-01T00:00:00Z"),

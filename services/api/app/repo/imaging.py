@@ -13,6 +13,11 @@ from PIL import Image, ImageOps, ImageStat
 # photo. Neutral grayscale scans measure ~0; warm-toned sepia prints land around
 # 0.05-0.15; ordinary colour photos sit well above 0.2.
 COLOR_SATURATION_THRESHOLD = 0.18
+# Mean HSV saturation below which a colorized output is flagged as nearly
+# grayscale. Some checkpoints (notably ddcolor_paper at 512) return almost no
+# colour for some inputs (~0.01-0.02) even in upstream DDColor's own pipeline;
+# a normal colorization measures well above 0.1.
+NEAR_GRAYSCALE_OUTPUT_THRESHOLD = 0.03
 
 _ENCODERS: dict[str, tuple[str, str, dict]] = {
     "jpeg": ("JPEG", "image/jpeg", {"quality": 92, "subsampling": 0}),
@@ -67,6 +72,11 @@ def mean_saturation(img: Image.Image) -> float:
 
 def is_color(img: Image.Image) -> bool:
     return mean_saturation(img) > COLOR_SATURATION_THRESHOLD
+
+
+def is_near_grayscale(img: Image.Image) -> bool:
+    """True when a colorized output carries almost no colour (see the threshold)."""
+    return mean_saturation(img) < NEAR_GRAYSCALE_OUTPUT_THRESHOLD
 
 
 def to_grayscale_rgb(img: Image.Image) -> Image.Image:

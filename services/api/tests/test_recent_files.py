@@ -64,3 +64,30 @@ async def test_limit_applied_after_sort(client, monkeypatch):
     # The 5 most recent by upload time (file019, file018, file017, ...)
     assert data[0]["filename"] == "file019.txt"
     assert data[4]["filename"] == "file015.txt"
+
+
+@pytest.mark.asyncio
+async def test_offset_pages_through_every_object(client, monkeypatch):
+    """`offset` walks the newest-first list so older objects are reachable."""
+    fake_files = [
+        _make_file(f"uploads/file{i:03d}.txt", hours_ago=100 - i)
+        for i in range(12)
+    ]
+    monkeypatch.setattr(
+        files_service, "list_files", lambda prefix="": fake_files
+    )
+
+    first = (await client.get("/files?limit=5&offset=0")).json()
+    second = (await client.get("/files?limit=5&offset=5")).json()
+    third = (await client.get("/files?limit=5&offset=10")).json()
+    keys = [f["key"] for f in first + second + third]
+    assert len(keys) == 12
+    assert len(set(keys)) == 12
+    assert third[-1]["filename"] == "file000.txt"  # the oldest object
+    assert (await client.get("/files?limit=5&offset=12")).json() == []
+
+
+@pytest.mark.asyncio
+async def test_negative_offset_rejected(client):
+    response = await client.get("/files?offset=-1")
+    assert response.status_code == 400

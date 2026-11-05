@@ -89,18 +89,23 @@ def warm_listing_cache() -> None:
     prewarm_listing()
 
 
-def get_files(prefix: str = "", limit: int = 100) -> list[FileMetadata]:
+def get_files(
+    prefix: str = "", limit: int = 100, offset: int = 0
+) -> list[FileMetadata]:
     # SECURITY: this lists the whole bucket (or `prefix`) with no per-user
     # filter — see docs/SECURITY.md. A multi-tenant clone must scope this to
     # the caller's own prefixes, or users see each other's files.
     if limit < 1 or limit > 1000:
         raise ValueError("Limit must be between 1 and 1000")
+    if offset < 0:
+        raise ValueError("Offset must be 0 or greater")
     # list_files paginates the whole prefix (not just the first 1000 keys).
     # Sort newest-first here so the endpoint's "recent uploads" contract holds
-    # regardless of repo ordering, then slice to the requested limit.
+    # regardless of repo ordering, then slice to the requested page (`offset`
+    # newest rows skipped, so the UI can walk every object with Load more).
     files = list_files(prefix=prefix)
     files.sort(key=lambda f: f.uploaded_at, reverse=True)
-    return files[:limit]
+    return files[offset : offset + limit]
 
 
 def get_stats() -> UploadStats:

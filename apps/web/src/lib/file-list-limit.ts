@@ -9,6 +9,9 @@
  */
 export const FILE_LIST_LIMIT = 100;
 
+/** Rows per prefix in the Bucket Explorer's focused (single batch) view: the API maximum. */
+export const FOCUS_LIST_LIMIT = 1000;
+
 function formatCount(value: number): string {
   return new Intl.NumberFormat(undefined).format(value);
 }
@@ -40,4 +43,21 @@ export function fileListTruncationNotice(
   return `Showing the ${formatCount(
     shown,
   )} most recent objects in this bucket. Older objects aren't listed yet.`;
+}
+
+/**
+ * Copy shown above the Bucket Explorer list while older pages remain unloaded,
+ * or `null` when everything is already listed. "Load older files" fetches the
+ * next page, so unlike `fileListTruncationNotice` this never says the older
+ * objects are unreachable.
+ */
+export function fileListPageNotice(shown: number, total: number | undefined): string | null {
+  if (typeof total === "number" && Number.isFinite(total) && total > shown) {
+    return `Showing the ${formatCount(shown)} most recent of ${formatCount(
+      total,
+    )} objects in this bucket. Use "Load older files" below to reach the rest.`;
+  }
+  return `Showing the ${formatCount(
+    shown,
+  )} most recent objects in this bucket. Use "Load older files" below to reach the rest.`;
 }

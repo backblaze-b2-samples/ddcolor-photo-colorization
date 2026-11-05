@@ -200,9 +200,9 @@ export async function getHealth() {
   return apiFetch<HealthStatus>(API_CLIENT_ROUTES.health.path);
 }
 
-export async function getFiles(prefix = "", limit = 100) {
+export async function getFiles(prefix = "", limit = 100, offset = 0) {
   return apiFetch<FileMetadata[]>(
-    `${API_CLIENT_ROUTES.files.path}?prefix=${encodeURIComponent(prefix)}&limit=${limit}`
+    `${API_CLIENT_ROUTES.files.path}?prefix=${encodeURIComponent(prefix)}&limit=${limit}&offset=${offset}`
   );
 }
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BatchDetail, BatchItem } from "@ddcolor-photo-colorization/shared";
-import { Ban, Download, Palette, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, Download, FolderSearch, Palette, Play, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -22,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { StatusBadge } from "@/components/common/status-badge";
-import { CreateBatchDialog } from "./create-batch-dialog";
+import { CreateBatchDialog, type BatchPreset } from "./create-batch-dialog";
 import { EditBatchDialog } from "./edit-batch-dialog";
 import {
   alternateModel,
@@ -35,6 +36,7 @@ import {
   runningStageText,
 } from "@/lib/batch-labels";
 import { startBrowserDownload } from "@/lib/browser-download";
+import { batchFilesHref } from "@/lib/file-focus";
 import {
   isBatchActive,
   useCancelBatch,
@@ -44,7 +46,23 @@ import {
 } from "@/lib/queries";
 import { formatDate, humanizeBytes } from "@/lib/utils";
 
-function ItemCard({ item }: { item: BatchItem }) {
+/** File name without extension, for suggesting a one-photo batch's name. */
+function itemStem(item: BatchItem): string {
+  const name = item.original_key.split("/").pop() ?? item.original_key;
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(0, dot) : name;
+}
+
+function ItemCard({
+  item,
+  suggestedModel,
+  recolorize,
+}: {
+  item: BatchItem;
+  suggestedModel: string;
+  /** Preset for "Colorize again" on this photo alone; `null` while the batch is running. */
+  recolorize: BatchPreset | null;
+}) {
   const name = item.original_key.split("/").pop() ?? item.original_key;
   const [showComparison, setShowComparison] = useState(false);
   return (
@@ -76,6 +94,26 @@ function ItemCard({ item }: { item: BatchItem }) {
           </p>
         )}
         {item.error && <p className="text-destructive">{item.error}</p>}
+        {item.status === "done" && item.near_grayscale && (
+          <div className="space-y-1.5 text-amber-600 dark:text-amber-400">
+            <p>
+              Looks nearly grayscale: this model added almost no colour to this photo. Try{" "}
+              {suggestedModel}.
+            </p>
+            {recolorize && (
+              <CreateBatchDialog
+                presetKeys={[item.original_key]}
+                preset={recolorize}
+                trigger={
+                  <Button size="sm" variant="outline" className="h-7 text-xs">
+                    <Palette aria-hidden className="h-3.5 w-3.5" />
+                    Colorize this photo with {suggestedModel}
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        )}
         {item.comparison_url && (
           <button
             type="button"
@@ -102,6 +140,17 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
   const another = alternateModel(batch.model_id);
   // While the weights download, the bar tracks bytes, not photos (still 0).
   const downloadPercent = modelDownloadPercent(batch);
+  const filesHref = batchFilesHref(batch);
+  const rerunnable = canRun(batch.status) && batch.status !== "draft";
+  const flaggedKeys = batch.items
+    .filter((i) => i.status === "done" && i.near_grayscale)
+    .map((i) => i.original_key);
+  const anotherPreset: BatchPreset = {
+    model_id: another,
+    input_size: batch.input_size,
+    output_format: batch.output_format,
+    make_comparisons: batch.make_comparisons,
+  };
 
   const onRun = () =>
     run.mutate(batch.batch_id, {
@@ -185,7 +234,7 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
               {cancel.isPending ? "Cancelling..." : "Cancel batch"}
             </Button>
           )}
-          {canRun(batch.status) && batch.status !== "draft" && (
+          {rerunnable && (
             <CreateBatchDialog
               presetKeys={batch.items.map((i) => i.original_key)}
               preset={{
@@ -202,6 +251,28 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
                 </Button>
               }
             />
+          )}
+          {rerunnable && flaggedKeys.length > 0 && (
+            <CreateBatchDialog
+              presetKeys={flaggedKeys}
+              preset={{ ...anotherPreset, nameBase: `${batch.name}, flagged` }}
+              trigger={
+                <Button size="sm" variant="outline">
+                  <Palette aria-hidden className="h-3.5 w-3.5" />
+                  {flaggedKeys.length === 1
+                    ? `Re-colorize 1 flagged photo with ${modelLabel(another)}`
+                    : `Re-colorize ${flaggedKeys.length} flagged photos with ${modelLabel(another)}`}
+                </Button>
+              }
+            />
+          )}
+          {filesHref && (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={filesHref}>
+                <FolderSearch aria-hidden className="h-3.5 w-3.5" />
+                View in Bucket Explorer
+              </Link>
+            </Button>
           )}
           <Button size="sm" variant="outline" onClick={onManifest} disabled={!batch.manifest_key}>
             <Download aria-hidden className="h-3.5 w-3.5" />
@@ -289,7 +360,16 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {batch.items.map((item) => (
-          <ItemCard key={item.original_key} item={item} />
+          <ItemCard
+            key={item.original_key}
+            item={item}
+            suggestedModel={modelLabel(another)}
+            recolorize={
+              rerunnable
+                ? { ...anotherPreset, nameBase: `${batch.name}, ${itemStem(item)}` }
+                : null
+            }
+          />
         ))}
       </div>
     </div>

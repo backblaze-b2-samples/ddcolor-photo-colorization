@@ -59,7 +59,7 @@ export function buildFileTree(files: FileMetadata[]): TreeNode[] {
     });
   }
 
-  // Sort: folders first (alphabetical), then files (most recent first)
+  // Sort: folders first (alphabetical; batch folders newest first), then files (most recent first)
   sortTree(root.children);
 
   return root.children;
@@ -124,11 +124,19 @@ export function initialExpandedPaths(
   return expanded;
 }
 
+const BATCH_FOLDER_RE = /^b-\d{8}-\d{6}-[0-9a-f]{6}$/;
+
 function sortTree(nodes: TreeNode[]) {
   nodes.sort((a, b) => {
     if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
     if (a.type === "folder" && b.type === "folder") {
-      return a.name.localeCompare(b.name);
+      // Batch folders (`b-YYYYMMDD-HHMMSS-xxxxxx`) go after the plain ones,
+      // newest first: the id is a sortable timestamp, and the batch you just
+      // ran is the one you want on the first screen.
+      const aBatch = BATCH_FOLDER_RE.test(a.name);
+      const bBatch = BATCH_FOLDER_RE.test(b.name);
+      if (aBatch !== bBatch) return aBatch ? 1 : -1;
+      return aBatch ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name);
     }
     // Files: most recent first
     if (a.type === "file" && b.type === "file") {

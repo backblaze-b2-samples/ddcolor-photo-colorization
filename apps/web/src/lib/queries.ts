@@ -2,6 +2,7 @@
 
 import {
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type QueryClient,
@@ -39,6 +40,7 @@ import type {
   FileUrlResponse,
 } from "@ddcolor-photo-colorization/shared";
 import { qk } from "@/lib/generated/query-keys";
+import { FOCUS_LIST_LIMIT } from "@/lib/file-list-limit";
 
 // Query keys are GENERATED from the API contract (`pnpm gen:api`) and their
 // hierarchy is declared in `scripts/gen/api-gen.config.json`, so invalidating
@@ -69,6 +71,85 @@ export function useFiles(prefix = "", limit = 100, { enabled = true }: QueryGate
     queryKey: qk.files(prefix, limit),
     queryFn: () => getFiles(prefix, limit),
     enabled,
+  });
+}
+
+/**
+ * The first `pageCount` newest-first pages of the bucket listing, merged.
+ *
+ * Page 0 shares `useFiles`' cache entry (same key), and every page is an
+ * ordinary array query under the `files` key, so the delete cache surgery and
+ * the post-upload invalidation reach all of them. "Load more" is just
+ * `pageCount + 1`. Rows are de-duplicated by key because an upload between two
+ * page fetches shifts the offsets by one.
+ */
+export function useFilePages(prefix: string, pageSize: number, pageCount: number) {
+  const { results, files } = useQueries({
+    queries: Array.from({ length: pageCount }, (_, page) => ({
+      queryKey: qk.files(prefix, pageSize, page * pageSize),
+      queryFn: () => getFiles(prefix, pageSize, page * pageSize),
+    })),
+    // `combine` output is structurally shared, so `files` keeps its identity
+    // between renders while no page changed (the tree and effects key on it).
+    combine: (queryResults) => {
+      const seen = new Set<string>();
+      const merged: FileMetadata[] = [];
+      for (const result of queryResults) {
+        for (const file of result.data ?? []) {
+          if (seen.has(file.key)) continue;
+          seen.add(file.key);
+          merged.push(file);
+        }
+      }
+      return { results: queryResults, files: merged };
+    },
+  });
+  const first = results[0];
+  const last = results[results.length - 1];
+  return {
+    files,
+    isLoading: first.isLoading,
+    isFetching: results.some((r) => r.isFetching),
+    // A failure on a later page must not blank the pages already on screen.
+    error: first.error as ApiError | null,
+    loadMoreError: pageCount > 1 ? (last.error as ApiError | null) : null,
+    /** The last page came back full, so another one may exist. */
+    hasMore: last.data !== undefined && last.data.length >= pageSize,
+    isLoadingMore: pageCount > 1 && last.isLoading,
+    refetch: () => Promise.all(results.map((r) => r.refetch())),
+  };
+}
+
+/**
+ * Every object (up to the API's 1000-row page) under each of `prefixes`,
+ * merged and de-duplicated. Backs the Bucket Explorer's focused view: unlike the
+ * recent-objects pages these are exact prefix listings, so an object is
+ * reachable however old it is. Disabled while `prefixes` is empty.
+ */
+export function useFilesByPrefixes(prefixes: string[]) {
+  return useQueries({
+    queries: prefixes.map((prefix) => ({
+      queryKey: qk.files(prefix, FOCUS_LIST_LIMIT, 0),
+      queryFn: () => getFiles(prefix, FOCUS_LIST_LIMIT, 0),
+    })),
+    combine: (results) => {
+      const seen = new Set<string>();
+      const files: FileMetadata[] = [];
+      for (const result of results) {
+        for (const file of result.data ?? []) {
+          if (seen.has(file.key)) continue;
+          seen.add(file.key);
+          files.push(file);
+        }
+      }
+      return {
+        files,
+        isLoading: results.some((r) => r.isLoading),
+        isFetching: results.some((r) => r.isFetching),
+        error: (results.find((r) => r.error)?.error ?? null) as ApiError | null,
+        refetch: () => Promise.all(results.map((r) => r.refetch())),
+      };
+    },
   });
 }
 

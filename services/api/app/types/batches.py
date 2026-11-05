@@ -80,6 +80,7 @@ class BatchItemRecord(BaseModel):
     original_bytes: int | None = None
     colorized_bytes: int | None = None
     comparison_bytes: int | None = None
+    near_grayscale: bool = False
     processed_at: datetime | None = None
 
 
@@ -142,6 +143,10 @@ class BatchItem(ResponseModel):
     width: int | None = None
     height: int | None = None
     duration_ms: int | None = None
+    near_grayscale: bool = Field(
+        default=False,
+        description="The colorized output has almost no colour (model output, not an error).",
+    )
     original_url: str = Field(description="Inline presigned GET for the grayscale original.")
     colorized_url: str | None = None
     comparison_url: str | None = None

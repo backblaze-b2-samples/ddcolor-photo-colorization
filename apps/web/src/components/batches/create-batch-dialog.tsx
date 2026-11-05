@@ -50,7 +50,7 @@ import { useCreateBatch, usePhotos } from "@/lib/queries";
 
 // Every finite field is a selector, never free text (form UX convention; see
 // components/settings/settings-form.tsx). Safe defaults are pre-selected and
-// explained in FormDescription; the name field only shows a placeholder.
+// explained in FormDescription; the name field is pre-filled with a suggestion.
 const schema = z
   .object({
     name: z.string().trim().min(1, "Give the batch a name").max(120),
@@ -75,6 +75,12 @@ const schema = z
 
 type Values = z.infer<typeof schema>;
 
+/** "<model label>, <date>": the suggested name for a fresh batch. */
+function defaultName(model: Values["model_id"], now = new Date()): string {
+  const date = now.toLocaleDateString("en-CA"); // YYYY-MM-DD in local time
+  return `${modelLabel(model)}, ${date}`.slice(0, 120);
+}
+
 /** "<base> (<model label>)": the suggested name for a re-run with another model. */
 function suggestedName(nameBase: string, model: Values["model_id"]): string {
   return `${nameBase} (${modelLabel(model)})`.slice(0, 120);
@@ -83,7 +89,9 @@ function suggestedName(nameBase: string, model: Values["model_id"]): string {
 function defaults(presetKeys: string[], preset: BatchPreset = {}): Values {
   const model_id = preset.model_id ?? "ddcolor_artistic";
   return {
-    name: preset.nameBase ? suggestedName(preset.nameBase, model_id) : (preset.name ?? ""),
+    name: preset.nameBase
+      ? suggestedName(preset.nameBase, model_id)
+      : (preset.name ?? defaultName(model_id)),
     description: "",
     source: presetKeys.length > 0 ? "choose" : "all",
     sourceKeys: presetKeys,
@@ -123,13 +131,14 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
   const modelId = useWatch({ control: form.control, name: "model_id" });
   const nameEdited = form.formState.dirtyFields.name === true;
   const nameBase = preset?.nameBase;
+  const presetName = preset?.name;
 
   // Keep the suggested name in step with the chosen model, until the user types their own.
   useEffect(() => {
-    if (!nameBase || nameEdited) return;
-    form.setValue("name", suggestedName(nameBase, modelId));
+    if (nameEdited || presetName !== undefined) return;
+    form.setValue("name", nameBase ? suggestedName(nameBase, modelId) : defaultName(modelId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelId, nameBase, nameEdited]);
+  }, [modelId, nameBase, presetName, nameEdited]);
 
   // Re-seed whenever the dialog opens, so a fresh Photo Library selection lands.
   useEffect(() => {
@@ -170,7 +179,10 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      {/* `grid-cols-[minmax(0,1fr)]`: the base DialogContent is a grid whose single
+          auto column grows to its widest child, so one wide child pushed every
+          field past the dialog's right edge. The column now stays dialog-wide. */}
+      <DialogContent className="flex max-h-[calc(100vh-4rem)] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New colorization batch</DialogTitle>
           <DialogDescription>
@@ -179,7 +191,11 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex min-h-0 flex-1 flex-col gap-4"
+          >
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-1 pb-1">
             <FormField
               control={form.control}
               name="name"
@@ -187,7 +203,7 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Archive box 1" {...field} />
+                    <Input placeholder="Name this batch" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -287,14 +303,17 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
                   <FormLabel>Model</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
+                      <SelectTrigger className="w-full min-w-0">
+                        {/* Label only: the default SelectValue mirrors the whole item,
+                            description included, into this nowrap trigger and made it
+                            far wider than the dialog. */}
+                        <SelectValue>{modelLabel(field.value)}</SelectValue>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {MODEL_OPTIONS.map((m) => (
                         <SelectItem key={m.value} value={m.value}>
-                          <span className="flex flex-col">
+                          <span className="flex max-w-[28rem] flex-col whitespace-normal">
                             <span>{m.label}</span>
                             <span className="text-xs text-muted-foreground">{m.description}</span>
                           </span>
@@ -311,7 +330,7 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
                 </FormItem>
               )}
             />
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid items-start gap-5 sm:grid-cols-2 [&>*]:min-w-0">
               <FormField
                 control={form.control}
                 name="input_size"
@@ -379,7 +398,8 @@ export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBa
                 </FormItem>
               )}
             />
-            <DialogFooter>
+            </div>
+            <DialogFooter className="shrink-0">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>

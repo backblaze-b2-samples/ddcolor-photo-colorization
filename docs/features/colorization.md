@@ -46,7 +46,7 @@ Turn each grayscale original into a full-colour reconstruction at its original r
 | --- | --- | --- | --- |
 | `ddcolor_artistic` | ConvNeXt-L | 912 MB | default; often the most saturated, but some portraits come out muted or sepia (try ModelScope via "Colorize again with another model") |
 | `ddcolor_modelscope` | ConvNeXt-L | 912 MB | upstream demo default |
-| `ddcolor_paper` | ConvNeXt-L | 912 MB | ICCV 2023 paper checkpoint |
+| `ddcolor_paper` | ConvNeXt-L | 912 MB | ICCV 2023 paper checkpoint; at 512 some portraits come back nearly grayscale, with blue fringes at the edges (same in upstream DDColor's own pipeline) |
 | `ddcolor_paper_tiny` | ConvNeXt-T | 220 MB | fastest on CPU; often nearly grayscale output on portraits and street scenes |
 
 ## Edge Cases
@@ -55,6 +55,7 @@ Turn each grayscale original into a full-colour reconstruction at its original r
 - Weight download stalls (no new bytes in the Hub cache for `MODEL_DOWNLOAD_STALL_SECONDS`, default 120) -> every item `failed` with a "stalled" error; the abandoned download thread never blocks the worker, and a re-run resumes the partial download
 - While a model downloads or loads, the queued batch carries `stage` (`downloading_model` / `loading_model`) and `model_download_bytes`, polled every second from the bytes in the Hub cache; the batch page shows it as text and as a determinate bar (bytes over the checkpoint's approximate size)
 - Photo over `MAX_PHOTO_PIXELS` or undecodable -> that item `failed`
+- Output with almost no colour (mean HSV saturation below `NEAR_GRAYSCALE_OUTPUT_THRESHOLD`, 0.03, in `repo/imaging.py`) -> item `done` and flagged `near_grayscale`; the output is not altered
 - 16-bit grayscale TIFF -> scaled to 8 bits, not clipped
 - Transparent PNG -> flattened onto white
 - Switching model between batches -> previous model evicted and device cache freed before loading

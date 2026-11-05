@@ -89,6 +89,11 @@ export interface BatchItem {
   duration_ms: number | null;
   error: string | null;
   height: number | null;
+  /**
+   * The colorized output has almost no colour (model output, not an
+   * error).
+   */
+  near_grayscale: boolean;
   original_key: string;
   /** Inline presigned GET for the grayscale original. */
   original_url: string;

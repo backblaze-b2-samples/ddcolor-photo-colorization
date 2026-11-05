@@ -409,6 +409,12 @@
             ],
             "title": "Height"
           },
+          "near_grayscale": {
+            "default": false,
+            "description": "The colorized output has almost no colour (model output, not an error).",
+            "title": "Near Grayscale",
+            "type": "boolean"
+          },
           "original_key": {
             "title": "Original Key",
             "type": "string"
@@ -442,6 +448,7 @@
           "width",
           "height",
           "duration_ms",
+          "near_grayscale",
           "original_url",
           "colorized_url",
           "comparison_url"
@@ -1884,6 +1891,7 @@
     },
     "/files": {
       "get": {
+        "description": "Newest-first page of objects: `offset` skips that many newest rows.",
         "operationId": "list_files_endpoint_files_get",
         "parameters": [
           {
@@ -1903,6 +1911,16 @@
             "schema": {
               "default": 100,
               "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
               "type": "integer"
             }
           }

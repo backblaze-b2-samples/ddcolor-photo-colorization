@@ -67,6 +67,7 @@ async def test_create_and_run_writes_outputs_comparisons_and_manifest(client, li
     assert item["colorized_key"] == f"colorization/colorized/{batch_id}/harbour.jpg"
     assert item["colorized_url"].startswith("https://signed.example/")
     assert item["comparison_key"] in library.objects
+    assert item["near_grayscale"] is False  # the warm tint is real colour
 
     manifest_key = f"colorization/manifests/{batch_id}.csv"
     rows = list(csv.DictReader(io.StringIO(library.objects[manifest_key]["Body"].decode())))
@@ -75,6 +76,17 @@ async def test_create_and_run_writes_outputs_comparisons_and_manifest(client, li
     assert detail["derived_bytes"] > 0
     # Originals are untouched.
     assert library.objects[f"{GRAY}street.png"]["Body"] == _png()
+
+
+@pytest.mark.asyncio
+async def test_nearly_grayscale_output_is_flagged_but_still_done(client, library, engine, monkeypatch):
+    # ddcolor_paper returns almost no colour for some portraits, even in upstream
+    # DDColor's own pipeline: the item is done, and flagged so the UI can say so.
+    monkeypatch.setattr(ddcolor, "colorize", lambda img, *a: img.convert("RGB"))
+    batch_id = (await _create(client, model_id="ddcolor_paper")).json()["batch_id"]
+    detail = (await client.get(f"/batches/{batch_id}")).json()
+    assert detail["status"] == "done"
+    assert all(i["status"] == "done" and i["near_grayscale"] for i in detail["items"])
 
 
 @pytest.mark.asyncio

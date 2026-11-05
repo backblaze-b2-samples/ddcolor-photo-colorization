@@ -78,6 +78,7 @@ def _process(record: BatchRecord, item: BatchItemRecord, targets: tuple[str, str
     colorized = ddcolor.colorize(
         grayscale, record.model_id.value, int(record.input_size), settings.ddcolor_device
     )
+    item.near_grayscale = imaging.is_near_grayscale(colorized)
     data, content_type = imaging.encode(colorized, record.output_format.value)
     colorized_key, comparison_key = targets
     batch_records.set_stage(batch_id, BatchStage.saving_result)
@@ -186,7 +187,7 @@ def run_batch_now(batch_id: str) -> None:
             return
         if stored.status == ItemStatus.done:  # kept by a re-run of unfinished photos
             continue
-        item = stored.model_copy(update={"status": ItemStatus.running, "error": None})
+        item = stored.model_copy(update={"status": ItemStatus.running, "error": None, "near_grayscale": False})
         if engine_error is None:
             batch_records.set_item(batch_id, index, item, persist=False)
             try:

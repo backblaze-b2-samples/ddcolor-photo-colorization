@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { FolderOpen, RefreshCw, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FolderOpen, RefreshCw, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,27 +27,52 @@ import { startBrowserDownload } from "@/lib/browser-download";
 import {
   useDeleteFile,
   useDownloadUrl,
+  useFilePages,
+  useFilesByPrefixes,
   useFileStats,
-  useFiles,
 } from "@/lib/queries";
+import { clearFocusFromUrl, readFocusFromUrl, type FileFocus } from "@/lib/file-focus";
 import { buildFileTree, initialExpandedPaths } from "@/lib/file-tree";
-import {
-  FILE_LIST_LIMIT,
-  fileListTruncationNotice,
-} from "@/lib/file-list-limit";
+import { FILE_LIST_LIMIT, fileListPageNotice } from "@/lib/file-list-limit";
 import { ancestorPaths, takePreviewKeyFromUrl } from "@/lib/preview-deep-link";
 import type { FileMetadata } from "@ddcolor-photo-colorization/shared";
 
 export function FileBrowser() {
+  // Newest-first pages; "Load more" asks for one more page so every object in
+  // the bucket, older batches' outputs included, can be reached.
+  const [pageCount, setPageCount] = useState(1);
   const {
-    data: files = [],
+    files,
     isLoading,
     isFetching,
     error,
+    loadMoreError,
+    hasMore,
+    isLoadingMore,
     refetch,
-  } = useFiles("", FILE_LIST_LIMIT);
+  } = useFilePages("", FILE_LIST_LIMIT, pageCount);
   // Only used to say how much of the bucket this page is *not* showing.
   const { data: stats } = useFileStats();
+
+  // Focused view (`/files?prefix=...`, from a batch page's "View in Bucket
+  // Explorer"): list exactly those prefixes instead of the recent page. Read from
+  // `window.location` in an effect, like the preview deep link, because `/files`
+  // is prerendered static.
+  const [focus, setFocus] = useState<FileFocus | null>(null);
+  const [withOriginals, setWithOriginals] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFocus(readFocusFromUrl());
+  }, []);
+  const focusPrefixes = useMemo(
+    () =>
+      focus
+        ? [...focus.prefixes, ...(withOriginals && focus.originals ? [focus.originals] : [])]
+        : [],
+    [focus, withOriginals],
+  );
+  const focused = useFilesByPrefixes(focusPrefixes);
+  const focusActive = focus !== null;
   const deleteMutation = useDeleteFile();
   const downloadMutation = useDownloadUrl();
   const downloadingKey = downloadMutation.isPending
@@ -59,7 +84,8 @@ export function FileBrowser() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FileMetadata | null>(null);
 
-  const tree = useMemo(() => buildFileTree(files), [files]);
+  const shownFiles = focusActive ? focused.files : files;
+  const tree = useMemo(() => buildFileTree(shownFiles), [shownFiles]);
 
   // Auto-expand the first time data arrives, deep enough that actual file rows
   // are on screen (see `initialExpandedPaths`) — expanding only the top level
@@ -69,12 +95,33 @@ export function FileBrowser() {
   // state is preserved (a deliberate UX improvement over the pre-TanStack-Query
   // version, which clobbered expansion state on every refresh).
   useEffect(() => {
-    if (files.length === 0) return;
+    if (focusActive || files.length === 0) return;
     // Syncing initial UI state once when async data first arrives is the
     // documented escape hatch for react-hooks/set-state-in-effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpanded((prev) => (prev.size > 0 ? prev : initialExpandedPaths(tree)));
-  }, [files.length, tree]);
+  }, [files.length, tree, focusActive]);
+
+  // Focused view: open every folder holding a listed object, so the batch's
+  // outputs are on screen without a click. Folders the user collapses stay
+  // collapsed across refetches (only keys not seen before are added).
+  const focusSeen = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!focusActive) return;
+    const fresh = focused.files
+      .map((f) => f.key)
+      .filter((key) => !focusSeen.current.has(key));
+    if (fresh.length === 0) return;
+    fresh.forEach((key) => focusSeen.current.add(key));
+    setExpanded((prev) => new Set([...prev, ...fresh.flatMap(ancestorPaths)]));
+  }, [focusActive, focused.files]);
+
+  const clearFocus = () => {
+    clearFocusFromUrl();
+    setFocus(null);
+    setWithOriginals(false);
+    focusSeen.current.clear();
+  };
 
   // Deep link from the ⌘K palette or a dashboard row (`/files?preview=<key>`):
   // reveal the file's folders and open its preview, so picking a specific file
@@ -150,35 +197,66 @@ export function FileBrowser() {
     setPreviewOpen(true);
   };
 
-  const truncationNotice = fileListTruncationNotice(
-    files.length,
-    stats?.total_files,
-    FILE_LIST_LIMIT,
-  );
+  const pageNotice = !focusActive && hasMore
+    ? fileListPageNotice(files.length, stats?.total_files)
+    : null;
+  const listLoading = focusActive ? focused.isLoading : isLoading;
+  const listFetching = focusActive ? focused.isFetching : isFetching;
+  const listError = focusActive ? focused.error : error;
+  const refreshList = () => (focusActive ? focused.refetch() : refetch());
 
   return (
     <>
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 space-y-0">
-          {/* Not "All Files": the endpoint returns the newest 100 objects. */}
-          <CardTitle className="card-title">Recent Files</CardTitle>
+          {/* Not "All Files": newest first, older pages load on demand. */}
+          <CardTitle className="card-title">
+            {focusActive ? "Files for this batch" : "Recent Files"}
+          </CardTitle>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetch()}
+            onClick={() => refreshList()}
             className="touch-target h-7 shrink-0 text-xs"
-            disabled={isFetching}
-            aria-label={isFetching ? "Refreshing file list" : "Refresh file list"}
+            disabled={listFetching}
+            aria-label={listFetching ? "Refreshing file list" : "Refresh file list"}
           >
             <RefreshCw
               aria-hidden="true"
-              className={`h-3.5 w-3.5 mr-1 ${isFetching ? "animate-spin" : ""}`}
+              className={`h-3.5 w-3.5 mr-1 ${listFetching ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
         </CardHeader>
-        <CardContent className="p-3" aria-busy={isLoading || isFetching}>
-          {isLoading ? (
+        <CardContent className="p-3" aria-busy={listLoading || listFetching}>
+          {focusActive && (
+            <div
+              className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+              role="note"
+            >
+              <span>
+                Showing only this batch&apos;s colorized outputs, comparisons and manifest.
+              </span>
+              <span className="flex items-center gap-2">
+                {focus?.originals && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    aria-pressed={withOriginals}
+                    onClick={() => setWithOriginals((v) => !v)}
+                  >
+                    {withOriginals ? "Hide originals" : "Also show originals"}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={clearFocus}>
+                  <X aria-hidden="true" className="h-3.5 w-3.5" />
+                  Show all files
+                </Button>
+              </span>
+            </div>
+          )}
+          {listLoading ? (
             <div className="space-y-2 px-1 py-1">
               {/* Visible language, not `sr-only`: this list needs a full bucket
                   listing (measured 2.8s-21s), and six pulsing bars with no
@@ -189,36 +267,45 @@ export function FileBrowser() {
                 <Skeleton key={i} className="h-8 w-full" />
               ))}
             </div>
-          ) : error ? (
+          ) : listError ? (
             <ErrorState
-              error={error}
+              error={listError}
               title="Couldn't load files"
-              onRetry={() => refetch()}
+              onRetry={() => refreshList()}
               className="px-4"
             />
-          ) : files.length === 0 ? (
-            <EmptyState
-              icon={FolderOpen}
-              title="This bucket is empty"
-              description="Upload some files to see them listed here."
-              action={
-                <Button asChild size="sm">
-                  <Link href="/upload">
-                    <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-                    Upload files
-                  </Link>
-                </Button>
-              }
-              className="px-4"
-            />
+          ) : shownFiles.length === 0 ? (
+            focusActive ? (
+              <EmptyState
+                icon={FolderOpen}
+                title="No outputs for this batch yet"
+                description="Its colorized photos, comparisons and manifest appear here once they are saved to B2."
+                className="px-4"
+              />
+            ) : (
+              <EmptyState
+                icon={FolderOpen}
+                title="This bucket is empty"
+                description="Upload some files to see them listed here."
+                action={
+                  <Button asChild size="sm">
+                    <Link href="/upload">
+                      <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+                      Upload files
+                    </Link>
+                  </Button>
+                }
+                className="px-4"
+              />
+            )
           ) : (
             <div className="space-y-0.5 overflow-hidden" aria-label="Files in bucket">
-              {truncationNotice && (
+              {pageNotice && (
                 <p
                   className="mb-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
                   role="note"
                 >
-                  {truncationNotice}
+                  {pageNotice}
                 </p>
               )}
               {tree.map((node) => (
@@ -234,6 +321,23 @@ export function FileBrowser() {
                   downloadingKey={downloadingKey}
                 />
               ))}
+              {!focusActive && loadMoreError && (
+                <p className="px-3 py-2 text-xs text-destructive" role="alert">
+                  Couldn&apos;t load older files: {loadMoreError.message}
+                </p>
+              )}
+              {!focusActive && hasMore && (
+                <div className="flex justify-center pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPageCount((n) => n + 1)}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? "Loading older files..." : "Load older files"}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

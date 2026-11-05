@@ -87,9 +87,10 @@ def _delete_file_response(key: str) -> DeleteFileResponse:
 
 
 @router.get("/files", response_model=list[FileMetadata])
-def list_files_endpoint(prefix: str = "", limit: int = 100):
+def list_files_endpoint(prefix: str = "", limit: int = 100, offset: int = 0):
+    """Newest-first page of objects: `offset` skips that many newest rows."""
     try:
-        return get_files(prefix=prefix, limit=limit)
+        return get_files(prefix=prefix, limit=limit, offset=offset)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 

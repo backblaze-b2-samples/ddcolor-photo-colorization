@@ -144,7 +144,7 @@ def get_batch(batch_id: str) -> BatchDetail:
             **item.model_dump(
                 include={
                     "original_key", "colorized_key", "comparison_key", "status",
-                    "error", "width", "height", "duration_ms",
+                    "error", "width", "height", "duration_ms", "near_grayscale",
                 }
             ),
             original_url=_view_url(item.original_key) or "",
