@@ -31,7 +31,7 @@ Turn each grayscale original into a full-colour reconstruction at its original r
 
 ## Flow
 - Decode with Pillow, apply EXIF orientation, desaturate to luminance (so a colour upload is treated as its grayscale version), keep 3 channels
-- `load_model`: resolve the device (first of CUDA, Apple MPS, CPU for `auto`; an unavailable explicit choice falls back to CPU with a warning), download or reuse `piddnad/<model_id>` from the Hugging Face Hub, keep it as the single resident model
+- `load_model`: resolve the device (first of CUDA, Apple MPS, CPU for `auto`; an unavailable explicit choice falls back to CPU with a warning), reuse `piddnad/<model_id>` straight from the local Hub cache when its config and weights are already there (no network, no download stage), otherwise download it over plain HTTPS (Xet is disabled by default via `HF_HUB_DISABLE_XET=1`, because Xet writes the blob in bursts and the cache size would stop tracking live bytes), keep it as the single resident model
 - DDColor's own `ColorizationPipeline`: convert to Lab, run the network on the `L` channel resized to `input_size` x `input_size`, predict the `ab` channels, resize `ab` back to the original size, recombine with the original full-resolution `L`, convert to RGB
 - Encode, `put_object`, optional comparison `put_object`
 
@@ -44,14 +44,16 @@ Turn each grayscale original into a full-colour reconstruction at its original r
 ## Models
 | `model_id` | Encoder | Weights | Notes |
 | --- | --- | --- | --- |
-| `ddcolor_paper_tiny` | ConvNeXt-T | 220 MB | default; fastest on CPU |
-| `ddcolor_modelscope` | ConvNeXt-L | 912 MB | best overall quality |
+| `ddcolor_artistic` | ConvNeXt-L | 912 MB | default; often the most saturated, but some portraits come out muted or sepia (try ModelScope via "Colorize again with another model") |
+| `ddcolor_modelscope` | ConvNeXt-L | 912 MB | upstream demo default |
 | `ddcolor_paper` | ConvNeXt-L | 912 MB | ICCV 2023 paper checkpoint |
-| `ddcolor_artistic` | ConvNeXt-L | 912 MB | more saturated colour |
+| `ddcolor_paper_tiny` | ConvNeXt-T | 220 MB | fastest on CPU; often nearly grayscale output on portraits and street scenes |
 
 ## Edge Cases
 - ML stack missing -> 503 with the install command; core API keeps working
 - Weights unreachable (offline, Hub down) -> every item `failed` with the load error
+- Weight download stalls (no new bytes in the Hub cache for `MODEL_DOWNLOAD_STALL_SECONDS`, default 120) -> every item `failed` with a "stalled" error; the abandoned download thread never blocks the worker, and a re-run resumes the partial download
+- While a model downloads or loads, the queued batch carries `stage` (`downloading_model` / `loading_model`) and `model_download_bytes`, polled every second from the bytes in the Hub cache; the batch page shows it as text and as a determinate bar (bytes over the checkpoint's approximate size)
 - Photo over `MAX_PHOTO_PIXELS` or undecodable -> that item `failed`
 - 16-bit grayscale TIFF -> scaled to 8 bits, not clipped
 - Transparent PNG -> flattened onto white

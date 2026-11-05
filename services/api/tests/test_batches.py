@@ -33,7 +33,7 @@ def _fake_colorize(img, model_id, input_size, device):
 @pytest.fixture
 def engine(monkeypatch):
     monkeypatch.setattr(ddcolor, "ml_available", lambda: True)
-    monkeypatch.setattr(ddcolor, "load_model", lambda m, d: (f"{m}@abc123", "cpu"))
+    monkeypatch.setattr(ddcolor, "load_model", lambda m, d, **kw: (f"{m}@abc123", "cpu"))
     monkeypatch.setattr(ddcolor, "colorize", _fake_colorize)
     # Run synchronously so the test observes the finished batch.
     monkeypatch.setattr(colorize_runner, "enqueue", colorize_runner.run_batch_now)
@@ -60,7 +60,7 @@ async def test_create_and_run_writes_outputs_comparisons_and_manifest(client, li
     detail = (await client.get(f"/batches/{batch_id}")).json()
     assert detail["status"] == "done"
     assert detail["done_count"] == 2 and detail["failed_count"] == 0
-    assert detail["model_version"] == "ddcolor_paper_tiny@abc123"
+    assert detail["model_version"] == "ddcolor_artistic@abc123"
     by_key = {i["original_key"]: i for i in detail["items"]}
     item = by_key[f"{GRAY}harbour.png"]
     assert (item["width"], item["height"]) == (64, 40)  # original resolution kept
@@ -71,7 +71,7 @@ async def test_create_and_run_writes_outputs_comparisons_and_manifest(client, li
     manifest_key = f"colorization/manifests/{batch_id}.csv"
     rows = list(csv.DictReader(io.StringIO(library.objects[manifest_key]["Body"].decode())))
     assert {r["status"] for r in rows} == {"done"}
-    assert rows[0]["model_version"] == "ddcolor_paper_tiny@abc123"
+    assert rows[0]["model_version"] == "ddcolor_artistic@abc123"
     assert detail["derived_bytes"] > 0
     # Originals are untouched.
     assert library.objects[f"{GRAY}street.png"]["Body"] == _png()
@@ -113,7 +113,7 @@ async def test_edit_changes_only_name_and_description(client, library, engine):
     assert resp.status_code == 200
     body = resp.json()
     assert (body["name"], body["description"], body["model_id"]) == (
-        "Box 2", "harbour set", "ddcolor_paper_tiny",
+        "Box 2", "harbour set", "ddcolor_artistic",
     )
 
 
@@ -134,12 +134,16 @@ async def test_rerun_with_another_model_keeps_both_versions(client, library, eng
     assert nothing_left.status_code == 400  # all already colorized
     second = (
         await _create(
-            client, all_unprocessed=False, model_id="ddcolor_artistic",
+            client, all_unprocessed=False, model_id="ddcolor_paper_tiny",
             source_keys=[f"{GRAY}street.png"],
         )
     ).json()["batch_id"]
     detail = (await client.get("/photos-by-key/detail", params={"key": f"{GRAY}street.png"})).json()
     assert {v["batch_id"] for v in detail["versions"]} == {first, second}
+    # The library card names the checkpoint behind the version it shows (the latest).
+    cards = {p["key"]: p for p in (await client.get("/photos")).json()["items"]}
+    assert cards[f"{GRAY}street.png"]["colorized_model_id"] == "ddcolor_paper_tiny"
+    assert cards[f"{GRAY}harbour.png"]["colorized_model_id"] == "ddcolor_artistic"
     stats = (await client.get("/batches/stats")).json()
     assert stats["photos_colorized"] == 2 and stats["batches_total"] == 2
     assert stats["amplification_ratio"] > 1
@@ -187,7 +191,7 @@ def test_engine_failure_fails_every_item_and_still_writes_a_manifest(library, mo
     from app.service import batches as svc
     from app.types import CreateBatchRequest
 
-    def no_engine(model_id, device):
+    def no_engine(model_id, device, **kw):
         raise ddcolor.EngineUnavailableError("weights unreachable")
 
     monkeypatch.setattr(ddcolor, "ml_available", lambda: True)

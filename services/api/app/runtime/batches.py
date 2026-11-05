@@ -85,6 +85,15 @@ def run_batch_endpoint(batch_id: str):
         raise _http(e) from None
 
 
+@router.post("/batches/{batch_id}/cancel", response_model=Batch)
+def cancel_batch_endpoint(batch_id: str):
+    """Cancel a queued or running batch (409 if it has already settled)."""
+    try:
+        return batch_service.cancel_batch(batch_id)
+    except BatchError as e:
+        raise _http(e) from None
+
+
 @router.get("/batches/{batch_id}/manifest/download", response_model=FileUrlResponse)
 def manifest_download_endpoint(batch_id: str):
     try:

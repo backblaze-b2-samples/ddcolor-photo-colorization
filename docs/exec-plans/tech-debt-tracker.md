@@ -63,3 +63,13 @@ Known tech debt items. Agents update this when they discover or create tech debt
 | Custom `FileNotFoundError` shadowed the built-in | Renamed to `FileNotFoundServiceError` |
 | Dropzone accepted any file type client-side | `accept` allow-list mirroring backend `ALLOWED_TYPES` (tested for drift) |
 | No test harness for feature specs | pytest suite across upload, files, activity, errors, validation, rate limit, pagination |
+
+## 2026-11-04 — verify
+- New batch dialog — Name input, Model card, version counts and Output format run past the dialog's right edge → cut-off text for first-time users (.local/verify/A-r3/15-cta-after-click.png)
+- Photo Library — thumbnail tiles show as flat grey boxes for ~1–7s while images load (gate: over-claimed friction) → loading state not clearly distinguishable from broken (.local/verify/A-r3/17-photos-t1_4s.png)
+- Photo Library — a sepia 3-channel historical scan is tagged "was color" → label may confuse archivists who know it is a B&W scan (.local/verify/A-r3/05-photo-library.png)
+- Bucket Explorer — "Showing the 100 most recent of N objects", no load-more; top folder count reads "100 files" though it holds more → older originals unreachable, folder count reflects loaded items not totals (.local/verify/C-r3/08-bucket-explorer.png)
+- Batch page — status badge reads "Queued" during model download/load → badge says waiting while work happens (stage line compensates) (.local/verify/B-r3/06b-batch-download-t8s.png)
+- Batch page after Cancel — "Re-run 3 unfinished photos" changes to "Re-run 2" ~1s later as the in-flight photo finishes → count shifts after the user reads it (.local/verify/B-r3/11-cancel-settled.png)
+- Bulk Ingest — rows being uploaded render very faint while a stale rejected .txt row stays full contrast → in-progress rows hard to read (.local/verify/B-r3/03-upload-in-progress.png)
+- Batch page (paper model) — DDColor paper leaves some photos near-gray (Eiffel sat 0.019, Curie 0.076) with a cyan edge fringe → checkpoint variance; copy already says results vary (.local/verify/C-r3/06-library-after.png)

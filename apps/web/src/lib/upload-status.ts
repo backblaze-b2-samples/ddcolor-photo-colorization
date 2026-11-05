@@ -12,6 +12,8 @@ export interface UploadItem {
   error?: string;
   retryable?: boolean;
   metadata?: FileMetadataDetail | null;
+  /** The B2 key the upload landed at, once it is complete. */
+  key?: string;
 }
 
 /**

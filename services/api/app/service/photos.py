@@ -75,6 +75,7 @@ def _photo(obj: dict, versions: list[PhotoVersion], flagged: set[str]) -> Photo:
         colorized_versions=len(versions),
         original_url=_view_url(key),
         colorized_url=_view_url(versions[0].colorized_key) if versions else None,
+        colorized_model_id=versions[0].model_id if versions else None,
     )
 
 

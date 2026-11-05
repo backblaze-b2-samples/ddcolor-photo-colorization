@@ -140,6 +140,9 @@
     "post /batches/{batch_id}/run": {
       "route": "batchRun"
     },
+    "post /batches/{batch_id}/cancel": {
+      "route": "batchCancel"
+    },
     "get /batches/{batch_id}/manifest/download": {
       "route": "batchManifestDownload"
     },

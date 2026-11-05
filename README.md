@@ -71,12 +71,13 @@ pnpm dev            # web on localhost:3000, API on localhost:8000
 pnpm seed:demo      # optional: 8 public-domain historical photos into colorization/grayscale/
 ```
 
-Open **Batches → New batch**, keep the defaults (DDColor tiny, input 512, JPEG,
+Open **Batches → New batch**, keep the defaults (DDColor artistic, input 512, JPEG,
 comparisons on, run now) and create it. The batch page polls while the worker
 colorizes each photo; when it finishes you get a before/after gallery, a manifest
 CSV, and the dashboard's write-amplification ratio moves. The first run downloads
-the model weights from the Hugging Face Hub (about 220 MB for the tiny model, no
-token needed).
+the model weights from the Hugging Face Hub (about 900 MB for the default
+artistic model, no token needed); the batch page shows the download and load
+progress, and **Cancel batch** stops a batch at any point.
 
 `pnpm dev` runs a preflight first (Node/Python versions, venv, placeholder
 `.env`, busy ports) and says how to fix each problem; run it alone with
@@ -258,7 +259,7 @@ No. Originals live under `colorization/grayscale/` and are only ever read. Delet
 It is accepted and flagged `was color` in the Photo Library. The pipeline keeps only its luminance, so the output is DDColor's colorization of the grayscale version.
 
 **Which model should I pick?**
-DDColor tiny (ConvNeXt-T) is the default and the fastest on CPU. ModelScope, paper and artistic (ConvNeXt-L, about 900 MB each) trade speed for quality or saturation. A batch's model is fixed; create another batch to compare models, and both versions stay available.
+DDColor artistic (ConvNeXt-L, about 900 MB) is the default and often gives the most saturated result, but results vary per photo: some historical portraits come out muted or sepia, and on those ModelScope can do better (and the reverse happens too). When a result looks flat, use **Colorize again with another model** on the batch page: it opens a new batch preselected with the same photos, and both versions stay available. DDColor tiny (ConvNeXt-T, about 220 MB) is the fastest on CPU and the smallest download, but on those photos it often returns output that is nearly grayscale (a limitation of the checkpoint itself, reproduced with DDColor's own reference pipeline); it does better on landscapes. ModelScope and paper (ConvNeXt-L, about 900 MB each) are the other large checkpoints. A batch's model is fixed; to compare models, colorize the same photos in another batch.
 
 **How big can a scan be?**
 Up to 100 MB per upload and 60 million decoded pixels per photo (`MAX_PHOTO_PIXELS`). Output keeps the original resolution because the colour is recombined with the original luminance.

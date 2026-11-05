@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { CreateBatchDialog } from "@/components/batches/create-batch-dialog";
 import { Dropzone } from "./dropzone";
 import { UploadProgress } from "./upload-progress";
 import { useUploadQueue } from "@/lib/upload-queue-context";
@@ -28,6 +29,10 @@ export function UploadForm() {
     (i) => i.status === "complete" || i.status === "error",
   );
   const summary = uploadQueueSummary(items);
+  // The next step after an ingest: colorize exactly what just landed.
+  const uploadedKeys = items.flatMap((i) =>
+    i.status === "complete" && i.key ? [i.key] : [],
+  );
 
   return (
     <Card>
@@ -50,7 +55,7 @@ export function UploadForm() {
         )}
         <UploadProgress disabled={uploading} items={items} onRetry={retry} />
         {hasCompleted && !uploading && (
-          <div className="flex justify-end">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               aria-label="Clear completed and failed uploads"
               variant="outline"
@@ -59,6 +64,18 @@ export function UploadForm() {
             >
               Clear finished
             </Button>
+            {uploadedKeys.length > 0 && (
+              <CreateBatchDialog
+                presetKeys={uploadedKeys}
+                trigger={
+                  <Button size="sm">
+                    {uploadedKeys.length === 1
+                      ? "Colorize this photo"
+                      : `Colorize these ${uploadedKeys.length} photos`}
+                  </Button>
+                }
+              />
+            )}
           </div>
         )}
       </CardContent>

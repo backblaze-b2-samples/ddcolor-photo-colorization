@@ -67,6 +67,18 @@
             ],
             "title": "Manifest Key"
           },
+          "model_download_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model weight bytes in the local cache so far, while downloading.",
+            "title": "Model Download Bytes"
+          },
           "model_id": {
             "$ref": "#/components/schemas/ModelId"
           },
@@ -85,6 +97,17 @@
           "photo_count": {
             "title": "Photo Count",
             "type": "integer"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BatchStage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The worker's current step: preparing, downloading or loading the model while queued; reading, colorizing or saving the running photo; writing the manifest. Cleared once the batch settles."
           },
           "started_at": {
             "anyOf": [
@@ -122,6 +145,8 @@
           "original_bytes",
           "derived_bytes",
           "manifest_key",
+          "stage",
+          "model_download_bytes",
           "created_at",
           "updated_at",
           "started_at",
@@ -203,6 +228,18 @@
             ],
             "title": "Manifest Key"
           },
+          "model_download_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model weight bytes in the local cache so far, while downloading.",
+            "title": "Model Download Bytes"
+          },
           "model_id": {
             "$ref": "#/components/schemas/ModelId"
           },
@@ -232,6 +269,17 @@
           "photo_count": {
             "title": "Photo Count",
             "type": "integer"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BatchStage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The worker's current step: preparing, downloading or loading the model while queued; reading, colorizing or saving the running photo; writing the manifest. Cleared once the batch settles."
           },
           "started_at": {
             "anyOf": [
@@ -269,6 +317,8 @@
           "original_bytes",
           "derived_bytes",
           "manifest_key",
+          "stage",
+          "model_download_bytes",
           "created_at",
           "updated_at",
           "started_at",
@@ -399,6 +449,20 @@
         "title": "BatchItem",
         "type": "object"
       },
+      "BatchStage": {
+        "description": "The worker's current step: model preparation while queued, then per photo.",
+        "enum": [
+          "preparing_model",
+          "downloading_model",
+          "loading_model",
+          "reading_photo",
+          "colorizing_photo",
+          "saving_result",
+          "saving_manifest"
+        ],
+        "title": "BatchStage",
+        "type": "string"
+      },
       "BatchStatus": {
         "enum": [
           "draft",
@@ -407,7 +471,8 @@
           "done",
           "partial",
           "failed",
-          "interrupted"
+          "interrupted",
+          "cancelled"
         ],
         "title": "BatchStatus",
         "type": "string"
@@ -493,7 +558,7 @@
           },
           "model_id": {
             "$ref": "#/components/schemas/ModelId",
-            "default": "ddcolor_paper_tiny"
+            "default": "ddcolor_artistic"
           },
           "name": {
             "maxLength": 120,
@@ -992,6 +1057,17 @@
       "Photo": {
         "description": "One ingested original and a pointer to its latest colorized version.",
         "properties": {
+          "colorized_model_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Checkpoint that produced the latest colorized version."
+          },
           "colorized_url": {
             "anyOf": [
               {
@@ -1044,13 +1120,25 @@
           "was_color",
           "colorized_versions",
           "original_url",
-          "colorized_url"
+          "colorized_url",
+          "colorized_model_id"
         ],
         "title": "Photo",
         "type": "object"
       },
       "PhotoDetail": {
         "properties": {
+          "colorized_model_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Checkpoint that produced the latest colorized version."
+          },
           "colorized_url": {
             "anyOf": [
               {
@@ -1111,6 +1199,7 @@
           "colorized_versions",
           "original_url",
           "colorized_url",
+          "colorized_model_id",
           "versions"
         ],
         "title": "PhotoDetail",
@@ -1660,6 +1749,49 @@
           }
         },
         "summary": "Update Batch Endpoint",
+        "tags": [
+          "batches"
+        ]
+      }
+    },
+    "/batches/{batch_id}/cancel": {
+      "post": {
+        "description": "Cancel a queued or running batch (409 if it has already settled).",
+        "operationId": "cancel_batch_endpoint_batches__batch_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Batch Endpoint",
         "tags": [
           "batches"
         ]

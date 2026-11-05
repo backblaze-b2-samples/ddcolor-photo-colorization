@@ -7,8 +7,10 @@ Reliability expectations and practices for this project.
 
 - `GET /health` verifies B2 connectivity and returns `healthy` or `degraded`
 - Health endpoint is always available, even when B2 is down
-- The B2 client bounds connection attempts to 5 seconds, socket reads to 30
-  seconds, and standard retries to 3 total attempts. Normal tests mock this
+- The B2 client bounds connection attempts to 5 seconds and socket reads to 60
+  seconds (B2 latency spikes of 25-50 s per request were observed), with
+  botocore "standard" retries up to 5 total attempts: read timeouts, connection
+  errors, throttling and 5xx are retried with jittered backoff. Normal tests mock this
   boundary and deny network access; real connectivity is opt-in through
   `RUN_LIVE_B2_TESTS=1 pnpm test:live:b2`.
 
@@ -46,11 +48,12 @@ The download counter and the `/metrics` counters are **in-process, per replica**
 
 ## Colorization Runner
 
-- **One worker, FIFO queue, one batch at a time** (`service/colorize_runner.py`). DDColor is memory-heavy (the large checkpoints are about 900 MB), so batches never run concurrently; a second batch waits as `queued`.
+- **One worker, FIFO queue, one batch at a time** (`service/colorize_runner.py`). DDColor is memory-heavy (the large checkpoints are about 900 MB), so batches never run concurrently; a second batch waits as `queued`. A first-use weight download runs on its own thread under a stall watchdog (`MODEL_DOWNLOAD_STALL_SECONDS`, default 120 s without new bytes), so a stalled Hub download fails that batch with a clear error instead of wedging the worker; any queued or running batch can also be cancelled.
 - **One resident model.** `repo/ddcolor.py` keeps a single checkpoint loaded; switching model evicts the previous one and frees the CUDA/MPS cache first.
 - **Per-photo isolation.** A photo that fails (undecodable, over `MAX_PHOTO_PIXELS`, B2 error) marks only its item `failed` with the error; the batch continues and ends `done`, `partial` or `failed`. If the model itself cannot load, every item fails with that error and the manifest is still written, so the run is recorded.
 - **Status is durable.** Progress is persisted to the batch record in B2 after every photo, so the batch page and dashboard reflect it even across API restarts.
-- **Restart behaviour.** A stopped API cannot finish an in-flight batch. At the next startup a background thread marks every batch last written before that process started and still `queued`/`running` as `interrupted` (its in-progress item goes back to `pending`); the UI offers **Re-run**, which overwrites that batch's partial outputs. Disable with `RECOVER_BATCHES_ON_STARTUP=false`.
+- **Record writes are best-effort for the worker.** `batch_store.mutate` is cache-first: the change lands in the in-process record under a short lock (the batch page and the cancel check see it at once), then the B2 PUT runs under a separate flush lock and uploads the latest cached state. Live progress (model download bytes, the current photo's step) is cache-only. A record PUT that still fails after the client's retries is logged, never fatal: the next successful flush carries the change, and the start and finish writes retry up to 3 times. A failed manifest write leaves `manifest_key` empty; the outputs are kept. A slow B2 can therefore delay what reaches B2, never what the UI shows or whether the batch completes.
+- **Restart behaviour.** A stopped API cannot finish an in-flight batch. At the next startup a background thread marks every batch last written before that process started and still `queued`/`running` as `interrupted` (its in-progress item goes back to `pending`); the UI offers **Re-run**, which keeps the photos already colorized and re-runs the rest. Disable with `RECOVER_BATCHES_ON_STARTUP=false`.
 - **Single process.** The queue and the record lock are in-process. Run one API replica; several replicas would each run their own queue and could interleave writes to the same record.
 - **ML stack absent.** Run requests return 503 with the install command (`pnpm setup:ml`) instead of queuing a batch that would fail.
 - **Throughput** is dominated by the device and by B2 transfer time: DDColor tiny at 512 runs in well under a second per 1-megapixel photo on CPU or Apple MPS once warm (the first MPS call compiles kernels for several seconds); each photo also costs one `get_object` and two or three `put_object` calls.

@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     # MPS, then CPU. Force one with cpu | cuda | mps (an unavailable choice falls
     # back to CPU with a warning rather than failing the batch).
     ddcolor_device: str = "auto"
+    # A first-use Hugging Face weight download that adds no bytes for this long
+    # fails the batch with a clear error instead of leaving it queued forever.
+    model_download_stall_seconds: int = 120
     # Decoded-pixel ceiling per photo. DDColor recombines the predicted colour
     # with the ORIGINAL-resolution luminance, so memory grows with pixel count;
     # a photo above this fails its item with a clear error instead of OOMing.

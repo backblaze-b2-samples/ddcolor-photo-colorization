@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BatchDetail, BatchItem } from "@ddcolor-photo-colorization/shared";
-import { Download, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, Download, Palette, Play, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -22,10 +22,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { StatusBadge } from "@/components/common/status-badge";
+import { CreateBatchDialog } from "./create-batch-dialog";
 import { EditBatchDialog } from "./edit-batch-dialog";
-import { canRun, formatLabel, modelLabel, runLabel } from "@/lib/batch-labels";
+import {
+  alternateModel,
+  canRun,
+  formatLabel,
+  modelDownloadPercent,
+  modelLabel,
+  queuedStageText,
+  runLabel,
+  runningStageText,
+} from "@/lib/batch-labels";
 import { startBrowserDownload } from "@/lib/browser-download";
-import { useDeleteBatch, useManifestDownload, useRunBatch } from "@/lib/queries";
+import {
+  isBatchActive,
+  useCancelBatch,
+  useDeleteBatch,
+  useManifestDownload,
+  useRunBatch,
+} from "@/lib/queries";
 import { formatDate, humanizeBytes } from "@/lib/utils";
 
 function ItemCard({ item }: { item: BatchItem }) {
@@ -78,18 +94,38 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
   const router = useRouter();
   const run = useRunBatch();
   const remove = useDeleteBatch();
+  const cancel = useCancelBatch();
   const manifest = useManifestDownload();
   const settled = batch.done_count + batch.failed_count;
   const percent = batch.photo_count ? Math.round((settled / batch.photo_count) * 100) : 0;
+  const stageText = queuedStageText(batch) ?? runningStageText(batch);
+  const another = alternateModel(batch.model_id);
+  // While the weights download, the bar tracks bytes, not photos (still 0).
+  const downloadPercent = modelDownloadPercent(batch);
 
   const onRun = () =>
     run.mutate(batch.batch_id, {
-      onSuccess: () => toast.success("Batch queued"),
+      onSuccess: (queued) =>
+        toast.success("Batch queued", {
+          description:
+            queued.done_count > 0
+              ? `${queued.done_count} colorized photo(s) kept; the rest run again.`
+              : undefined,
+        }),
       onError: (error) =>
         toast.error(error.status === 503 ? "DDColor is not installed" : "Could not run batch", {
           description: error.message,
           duration: 12_000,
         }),
+    });
+
+  const onCancel = () =>
+    cancel.mutate(batch.batch_id, {
+      onSuccess: () =>
+        toast.success("Batch cancelled", {
+          description: "Finished photos keep their outputs. Re-run or delete it at any time.",
+        }),
+      onError: (error) => toast.error("Could not cancel batch", { description: error.message }),
     });
 
   const onDelete = () =>
@@ -140,8 +176,32 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
               ) : (
                 <RotateCcw aria-hidden className="h-3.5 w-3.5" />
               )}
-              {runLabel(batch.status)}
+              {run.isPending ? "Queuing..." : runLabel(batch)}
             </Button>
+          )}
+          {isBatchActive(batch.status) && (
+            <Button size="sm" variant="outline" onClick={onCancel} disabled={cancel.isPending}>
+              <Ban aria-hidden className="h-3.5 w-3.5" />
+              {cancel.isPending ? "Cancelling..." : "Cancel batch"}
+            </Button>
+          )}
+          {canRun(batch.status) && batch.status !== "draft" && (
+            <CreateBatchDialog
+              presetKeys={batch.items.map((i) => i.original_key)}
+              preset={{
+                name: `${batch.name} (${modelLabel(another)})`.slice(0, 120),
+                model_id: another,
+                input_size: batch.input_size,
+                output_format: batch.output_format,
+                make_comparisons: batch.make_comparisons,
+              }}
+              trigger={
+                <Button size="sm" variant="outline">
+                  <Palette aria-hidden className="h-3.5 w-3.5" />
+                  Colorize again with another model
+                </Button>
+              }
+            />
           )}
           <Button size="sm" variant="outline" onClick={onManifest} disabled={!batch.manifest_key}>
             <Download aria-hidden className="h-3.5 w-3.5" />
@@ -178,10 +238,33 @@ export function BatchDetailView({ batch }: { batch: BatchDetail }) {
         </CardHeader>
         <CardContent className="space-y-4 p-5">
           <div className="space-y-1.5">
-            <Progress value={percent} aria-label="Batch progress" />
+            {/* The shared Progress primitive does not forward `value` to its Radix
+                root, so the ARIA state is set here to keep the bar determinate. */}
+            {downloadPercent !== null ? (
+              <Progress
+                value={downloadPercent}
+                aria-label="Model download progress"
+                aria-valuenow={downloadPercent}
+                aria-valuetext={`${Math.round((batch.model_download_bytes ?? 0) / 1e6)} MB downloaded`}
+                data-state="loading"
+              />
+            ) : (
+              <Progress
+                value={percent}
+                aria-label="Batch progress"
+                aria-valuenow={percent}
+                aria-valuetext={`${settled} of ${batch.photo_count} photos settled`}
+                data-state={percent === 100 ? "complete" : "loading"}
+              />
+            )}
             <p className="text-xs text-muted-foreground tabular-nums">
               {batch.done_count} done · {batch.failed_count} failed · {batch.photo_count} total
             </p>
+            {stageText && (
+              <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+                {stageText}
+              </p>
+            )}
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-4">
             {facts.map(([label, value]) => (

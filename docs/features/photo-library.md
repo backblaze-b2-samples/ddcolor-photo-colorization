@@ -23,14 +23,14 @@ Show the archive the way an archivist thinks about it: one card per original, wi
 
 ## Outputs
 - `PhotoPage`: `items[]` + `next_cursor`
-- `Photo`: key, filename, size, last_modified, `was_color`, `colorized_versions`, inline presigned `original_url` and `colorized_url` (latest version)
+- `Photo`: key, filename, size, last_modified, `was_color`, `colorized_versions`, inline presigned `original_url` and `colorized_url` (latest version), `colorized_model_id` (the checkpoint behind that latest version)
 - `PhotoDetail`: `Photo` + `versions[]` (batch id and name, model, input size, colorized and comparison keys, size, processed_at, inline `colorized_url` / `comparison_url`, attachment `download_url`), newest first
 
 ## Flow
 - `list_objects_v2` of `grayscale/` (direct children only), sorted newest first, sliced by cursor
 - Versions come from the batch records (`done` items only), grouped by original key
 - `was_color` is one `list_objects_v2` of `flags/was-color/`: a marker exists only for originals the ingest check measured as colour (mean HSV saturation above 0.18)
-- URLs are signed per response; they last `PRESIGN_VIEW_EXPIRY_SECONDS` (1 hour)
+- URLs last `PRESIGN_VIEW_EXPIRY_SECONDS` (1 hour) and are reused while over half their lifetime remains, so polling responses return the same URL and the browser does not re-fetch images
 
 ## Edge Cases
 - Key outside the library (another prefix, or a nested path) -> 400; missing original -> 404
@@ -41,9 +41,9 @@ Show the archive the way an archivist thinks about it: one card per original, wi
 
 ## UX States
 - Empty: prompt to ingest or run `pnpm seed:demo`
-- Loading: skeleton tiles; Error: `ErrorState` with Retry
-- Card badges: version count ("grayscale" when none), "was color"
-- Detail sheet: before/after slider for the latest version, or the original with a hint when not colorized yet
+- Loading: skeleton tiles; each thumbnail shows a skeleton until its image paints (`components/common/loading-image.tsx`); Error: `ErrorState` with Retry
+- Card badges: version count ("grayscale" when none), "was color"; a colorized thumbnail is labelled with its model
+- Detail sheet: before/after slider labelled with the shown version's model and batch, defaulting to the latest; choosing a version row (thumbnail or model line) shows that version in the slider. The original with a hint when not colorized yet
 
 ## Verification
 - Test files: `services/api/tests/test_photos.py`, `services/api/tests/test_batches.py::test_rerun_with_another_model_keeps_both_versions`

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Download } from "lucide-react";
 
@@ -24,10 +25,18 @@ interface PhotoDetailSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Before/after slider for the latest version plus every version across batches. */
+/**
+ * Before/after slider plus every version across batches. The slider shows the
+ * latest version until the user picks another row; the label names its model.
+ */
 export function PhotoDetailSheet({ photoKey, onOpenChange }: PhotoDetailSheetProps) {
   const { data: photo, isLoading, error, refetch } = usePhotoDetail(photoKey);
-  const latest = photo?.versions[0];
+  // Keyed by photo, so opening another photo falls back to its latest version.
+  const [picked, setPicked] = useState<{ photo: string; version: string } | null>(null);
+  const pickedKey = picked && picked.photo === photoKey ? picked.version : undefined;
+  const shown =
+    photo?.versions.find((v) => v.colorized_key === pickedKey) ?? photo?.versions[0];
+  const show = (version: string) => photoKey && setPicked({ photo: photoKey, version });
 
   return (
     <Sheet open={!!photoKey} onOpenChange={onOpenChange}>
@@ -47,12 +56,21 @@ export function PhotoDetailSheet({ photoKey, onOpenChange }: PhotoDetailSheetPro
             <Skeleton className="aspect-[4/3] w-full" />
           ) : error ? (
             <ErrorState error={error} onRetry={() => refetch()} />
-          ) : photo && latest ? (
-            <BeforeAfterSlider
-              beforeUrl={photo.original_url}
-              afterUrl={latest.colorized_url}
-              alt={photo.filename}
-            />
+          ) : photo && shown ? (
+            <div className="space-y-1.5">
+              <BeforeAfterSlider
+                beforeUrl={photo.original_url}
+                afterUrl={shown.colorized_url}
+                alt={photo.filename}
+                afterLabel={modelLabel(shown.model_id)}
+              />
+              <p className="text-xs text-muted-foreground" aria-live="polite">
+                Showing {modelLabel(shown.model_id)} @ {shown.input_size} from{" "}
+                <span className="font-medium text-foreground">{shown.batch_name}</span>
+                {shown === photo.versions[0] ? " (latest)" : ""}
+                {photo.versions.length > 1 ? ". Choose a version below to compare it." : "."}
+              </p>
+            </div>
           ) : photo ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -69,32 +87,52 @@ export function PhotoDetailSheet({ photoKey, onOpenChange }: PhotoDetailSheetPro
                 Colorized versions ({photo.versions.length})
               </h3>
               <ul className="divide-y divide-border rounded-md border border-border">
-                {photo.versions.map((v) => (
-                  <li key={v.colorized_key} className="flex items-center gap-3 p-3 text-sm">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={v.colorized_url} alt="" className="h-12 w-16 rounded object-cover" />
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/batches/${v.batch_id}`}
-                        className="block truncate font-medium underline-offset-4 hover:underline"
-                      >
-                        {v.batch_name}
-                      </Link>
-                      <p className="text-xs text-muted-foreground">
-                        {modelLabel(v.model_id)} @ {v.input_size} · {humanizeBytes(v.size)}
-                        {v.processed_at && ` · ${formatDate(v.processed_at)}`}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      aria-label={`Download version from ${v.batch_name}`}
-                      onClick={() => startBrowserDownload(v.download_url)}
+                {photo.versions.map((v) => {
+                  const isShown = v.colorized_key === shown?.colorized_key;
+                  return (
+                    <li
+                      key={v.colorized_key}
+                      className={`flex items-center gap-3 p-3 text-sm ${isShown ? "bg-muted" : ""}`}
                     >
-                      <Download aria-hidden className="h-3.5 w-3.5" />
-                    </Button>
-                  </li>
-                ))}
+                      <button
+                        type="button"
+                        onClick={() => show(v.colorized_key)}
+                        aria-pressed={isShown}
+                        aria-label={`Show ${modelLabel(v.model_id)} from ${v.batch_name} in the slider`}
+                        className={`shrink-0 rounded ring-offset-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          isShown ? "ring-2 ring-primary" : "hover:opacity-80"
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={v.colorized_url} alt="" className="h-12 w-16 rounded object-cover" />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/batches/${v.batch_id}`}
+                          className="block truncate font-medium underline-offset-4 hover:underline"
+                        >
+                          {v.batch_name}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => show(v.colorized_key)}
+                          className="block text-left text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          {modelLabel(v.model_id)} @ {v.input_size} · {humanizeBytes(v.size)}
+                          {v.processed_at && ` · ${formatDate(v.processed_at)}`}
+                        </button>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Download version from ${v.batch_name}`}
+                        onClick={() => startBrowserDownload(v.download_url)}
+                      >
+                        <Download aria-hidden className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

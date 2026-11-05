@@ -67,6 +67,7 @@ them in a config file, commit, issue, PR, terminal transcript, or screenshot.
 | Web | `NEXT_PUBLIC_API_URL` | Public build-time configuration | separate-origin deploys only; Next.js inlines it at build time. |
 | API | `DDCOLOR_DEVICE` | Non-secret configuration | inference device: `auto` (default, CUDA then Apple MPS then CPU), `cpu`, `cuda` or `mps`. |
 | API | `HF_HOME` | Non-secret configuration | cache directory for the DDColor weights downloaded from the Hugging Face Hub (no token needed). |
+| API | `MODEL_DOWNLOAD_STALL_SECONDS` | Non-secret configuration | seconds without new bytes before a first-use Hugging Face weight download fails its batch (default `120`). |
 | API | `ENABLE_DOCS`, `ALLOWED_KEY_PREFIX` | Non-secret configuration | Set `ENABLE_DOCS=false` in production. `ALLOWED_KEY_PREFIX=colorization/` confines key operations when the bucket is shared. |
 | API | `API_CORS_ORIGINS`, `API_CORS_ORIGIN_REGEX` | Non-secret service configuration | Set the exact web origin per environment; never a broad production origin to cover rotating previews. |
 | API | rate and size settings | Non-secret service configuration | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_WRITE_PER_MINUTE`, `MAX_FILE_SIZE`. |

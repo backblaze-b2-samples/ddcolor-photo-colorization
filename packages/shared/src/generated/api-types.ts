@@ -24,12 +24,20 @@ export interface Batch {
   input_size: InputSize;
   make_comparisons: boolean;
   manifest_key: string | null;
+  /** Model weight bytes in the local cache so far, while downloading. */
+  model_download_bytes: number | null;
   model_id: ModelId;
   name: string;
   /** Bytes of the grayscale originals in this batch. */
   original_bytes: number;
   output_format: OutputFormat;
   photo_count: number;
+  /**
+   * The worker's current step: preparing, downloading or loading the model
+   * while queued; reading, colorizing or saving the running photo; writing
+   * the manifest. Cleared once the batch settles.
+   */
+  stage: BatchStage | null;
   started_at: string | null;
   status: BatchStatus;
   updated_at: string;
@@ -52,6 +60,8 @@ export interface BatchDetail {
   items: BatchItem[];
   make_comparisons: boolean;
   manifest_key: string | null;
+  /** Model weight bytes in the local cache so far, while downloading. */
+  model_download_bytes: number | null;
   model_id: ModelId;
   model_version: string | null;
   name: string;
@@ -59,6 +69,12 @@ export interface BatchDetail {
   original_bytes: number;
   output_format: OutputFormat;
   photo_count: number;
+  /**
+   * The worker's current step: preparing, downloading or loading the model
+   * while queued; reading, colorizing or saving the running photo; writing
+   * the manifest. Cleared once the batch settles.
+   */
+  stage: BatchStage | null;
   started_at: string | null;
   status: BatchStatus;
   updated_at: string;
@@ -80,7 +96,13 @@ export interface BatchItem {
   width: number | null;
 }
 
-export type BatchStatus = "draft" | "queued" | "running" | "done" | "partial" | "failed" | "interrupted";
+/**
+ * The worker's current step: model preparation while queued, then per
+ * photo.
+ */
+export type BatchStage = "preparing_model" | "downloading_model" | "loading_model" | "reading_photo" | "colorizing_photo" | "saving_result" | "saving_manifest";
+
+export type BatchStatus = "draft" | "queued" | "running" | "done" | "partial" | "failed" | "interrupted" | "cancelled";
 
 /** Dashboard aggregates, headlined by the write-amplification ratio. */
 export interface ColorizationStats {
@@ -253,6 +275,8 @@ export type OutputFormat = "jpeg" | "png" | "webp";
 
 /** One ingested original and a pointer to its latest colorized version. */
 export interface Photo {
+  /** Checkpoint that produced the latest colorized version. */
+  colorized_model_id: ModelId | null;
   /** Inline presigned GET for the latest colorized version. */
   colorized_url: string | null;
   colorized_versions: number;
@@ -270,6 +294,8 @@ export interface Photo {
 }
 
 export interface PhotoDetail {
+  /** Checkpoint that produced the latest colorized version. */
+  colorized_model_id: ModelId | null;
   /** Inline presigned GET for the latest colorized version. */
   colorized_url: string | null;
   colorized_versions: number;

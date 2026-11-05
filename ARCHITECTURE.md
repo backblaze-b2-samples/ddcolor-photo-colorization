@@ -221,6 +221,7 @@ still in step.
 | `GET /photos-by-key/detail` | `PhotoDetail` | `photoDetail` |
 | `PATCH /batches/{batch_id}` | `Batch` | `batchUpdate` |
 | `POST /batches` | — | `batchCreate` |
+| `POST /batches/{batch_id}/cancel` | `Batch` | `batchCancel` |
 | `POST /batches/{batch_id}/run` | `Batch` | `batchRun` |
 | `POST /upload/presign` | `PresignUploadResponse` | `uploadPresign` |
 | `POST /upload/verify` | `FileUploadResponse` | `uploadVerify` |

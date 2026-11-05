@@ -8,6 +8,8 @@ interface BeforeAfterSliderProps {
   beforeUrl: string;
   afterUrl: string;
   alt: string;
+  /** Corner label on the colorized side, e.g. the model that produced it. */
+  afterLabel?: string;
   className?: string;
 }
 
@@ -16,7 +18,13 @@ interface BeforeAfterSliderProps {
  * Both images are presigned B2 URLs rendered with plain <img>: they expire, so
  * routing them through next/image's optimizer cache would serve dead URLs.
  */
-export function BeforeAfterSlider({ beforeUrl, afterUrl, alt, className }: BeforeAfterSliderProps) {
+export function BeforeAfterSlider({
+  beforeUrl,
+  afterUrl,
+  alt,
+  afterLabel = "Colorized",
+  className,
+}: BeforeAfterSliderProps) {
   const [position, setPosition] = useState(50);
 
   return (
@@ -37,7 +45,7 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt, className }: Befor
         style={{ left: `${position}%` }}
       />
       <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white">
-        Colorized
+        {afterLabel}
       </span>
       <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white">
         Original
@@ -48,7 +56,7 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt, className }: Befor
         max={100}
         value={position}
         onChange={(e) => setPosition(Number(e.target.value))}
-        aria-label="Reveal colorized version"
+        aria-label={`Reveal colorized version (${afterLabel})`}
         className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
       />
     </div>

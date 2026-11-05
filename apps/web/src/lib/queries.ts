@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import {
   ApiError,
+  cancelBatch,
   createBatch,
   deleteBatch,
   deleteFile,
@@ -270,12 +271,49 @@ export function useDeleteBatch() {
   });
 }
 
+/**
+ * Show a batch's new status the moment the user acts: patch the cached detail
+ * optimistically, roll back on error, and write the server's answer on success
+ * (then refetch everything that depends on it).
+ */
+function statusMutation(
+  qc: QueryClient,
+  mutationFn: (batchId: string) => Promise<Batch>,
+  optimistic: BatchStatus,
+) {
+  return {
+    mutationFn,
+    onMutate: async (batchId: string) => {
+      const key = batchDetailKey(batchId);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<BatchDetail>(key);
+      if (previous) qc.setQueryData<BatchDetail>(key, { ...previous, status: optimistic, stage: null });
+      return { previous };
+    },
+    onError: (_error: ApiError, batchId: string, context?: { previous?: BatchDetail }) => {
+      if (context?.previous) qc.setQueryData(batchDetailKey(batchId), context.previous);
+    },
+    onSuccess: (batch: Batch) => {
+      qc.setQueryData<BatchDetail>(batchDetailKey(batch.batch_id), (old) =>
+        old ? { ...old, ...batch } : old,
+      );
+      invalidateColorization(qc);
+    },
+  };
+}
+
 export function useRunBatch() {
   const qc = useQueryClient();
-  return useMutation<Batch, ApiError, string>({
-    mutationFn: runBatch,
-    onSuccess: () => invalidateColorization(qc),
-  });
+  return useMutation<Batch, ApiError, string, { previous?: BatchDetail }>(
+    statusMutation(qc, runBatch, "queued"),
+  );
+}
+
+export function useCancelBatch() {
+  const qc = useQueryClient();
+  return useMutation<Batch, ApiError, string, { previous?: BatchDetail }>(
+    statusMutation(qc, cancelBatch, "cancelled"),
+  );
 }
 
 /** A mutation, like file downloads: a fresh presigned URL per click, never cached. */

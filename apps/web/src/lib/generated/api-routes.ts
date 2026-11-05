@@ -44,6 +44,7 @@ export const API_CLIENT_ROUTES = {
   photoDetail: { method: "get", path: "/photos-by-key/detail" },
   batchUpdate: { method: "patch", path: "/batches/{batch_id}" },
   batchCreate: { method: "post", path: "/batches" },
+  batchCancel: { method: "post", path: "/batches/{batch_id}/cancel" },
   batchRun: { method: "post", path: "/batches/{batch_id}/run" },
   uploadPresign: { method: "post", path: "/upload/presign" },
   uploadVerify: { method: "post", path: "/upload/verify" },

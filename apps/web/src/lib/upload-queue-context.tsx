@@ -141,7 +141,7 @@ export function UploadQueueProvider({
   const runQueue = useCallback(
     async (queue: UploadItem[]) => {
       if (queue.length === 0) return;
-      let anySuccess = false;
+      let successes = 0;
 
       try {
         for (const item of queue) {
@@ -175,14 +175,12 @@ export function UploadQueueProvider({
                       status: "complete",
                       progress: 100,
                       metadata: response.metadata,
+                      key: response.key,
                     }
                   : i,
               ),
             );
-            toast.success(
-              `${formatToastFileName(item.file.name)} uploaded successfully`,
-            );
-            anySuccess = true;
+            successes += 1;
           } catch (err) {
             const message =
               err instanceof Error ? err.message : "Upload failed";
@@ -199,7 +197,18 @@ export function UploadQueueProvider({
           }
         }
       } finally {
-        if (anySuccess) triggerRefresh();
+        if (successes > 0) {
+          triggerRefresh();
+          // One summary, and none on /upload: there the queue already shows
+          // each file's status inline, and a toast would sit over the
+          // "Colorize these N photos" button in the bottom-right corner.
+          if (window.location.pathname !== "/upload") {
+            toast.success(
+              successes === 1 ? "1 photo uploaded" : `${successes} photos uploaded`,
+              { description: "Open Bulk Ingest to colorize them." },
+            );
+          }
+        }
       }
     },
     [triggerRefresh],

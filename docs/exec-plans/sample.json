@@ -149,6 +149,12 @@
       "required": false,
       "secret": false,
       "note": "cache directory for the DDColor weights downloaded from the Hugging Face Hub (no token needed)"
+    },
+    {
+      "name": "MODEL_DOWNLOAD_STALL_SECONDS",
+      "required": false,
+      "secret": false,
+      "note": "seconds without new bytes before a first-use Hugging Face weight download fails its batch (default `120`)"
     }
   ],
   "attribution_token": "b2ai-ddcolor-photo-colorization",

@@ -51,8 +51,8 @@ def test_s3_client_has_bounded_network_waits(monkeypatch):
 
     config = captured["config"]
     assert config.connect_timeout == 5
-    assert config.read_timeout == 30
-    assert config.retries == {"mode": "standard", "total_max_attempts": 3}
+    assert config.read_timeout == 60
+    assert config.retries == {"mode": "standard", "total_max_attempts": 5}
 
 
 @pytest.mark.asyncio

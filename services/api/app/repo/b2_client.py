@@ -46,10 +46,12 @@ def get_s3_client():
         region_name=settings.b2_region,
         aws_access_key_id=settings.b2_application_key_id,
         aws_secret_access_key=settings.b2_application_key,
+        # B2 can spike to 25-50 s per request; "standard" retries read timeouts,
+        # connection errors, throttling and 5xx with jittered backoff.
         config=Config(
             connect_timeout=5,
-            read_timeout=30,
-            retries={"mode": "standard", "total_max_attempts": 3},
+            read_timeout=60,
+            retries={"mode": "standard", "total_max_attempts": 5},
             signature_version="s3v4",
             user_agent_extra="b2ai-ddcolor-photo-colorization",
         ),
@@ -210,6 +212,9 @@ def delete_file(key: str) -> None:
 
 
 DISPOSITIONS = ("attachment", "inline")
+_PRESIGN_CACHE_MAX = 5000
+_presign_cache: dict[tuple, tuple[float, str]] = {}
+_presign_lock = Lock()
 
 
 def get_presigned_url(
@@ -231,6 +236,13 @@ def get_presigned_url(
         raise ValueError(
             f"disposition must be one of {DISPOSITIONS}, got {disposition!r}"
         )
+    # Reuse a URL while over half its lifetime remains: re-signing on every
+    # poll changes the URL, and the browser re-fetches (and aborts) the image.
+    cache_key = (key, filename, expires_in, disposition)
+    with _presign_lock:
+        hit = _presign_cache.get(cache_key)
+    if hit is not None and time.monotonic() - hit[0] < expires_in / 2:
+        return hit[1]
     client = get_s3_client()
     params: dict = {"Bucket": settings.b2_bucket_name, "Key": key}
     if filename:
@@ -242,13 +254,14 @@ def get_presigned_url(
     else:
         params["ResponseContentDisposition"] = disposition
     try:
-        return client.generate_presigned_url(
-            "get_object",
-            Params=params,
-            ExpiresIn=expires_in,
-        )
+        url = client.generate_presigned_url("get_object", Params=params, ExpiresIn=expires_in)
     except ClientError as e:
         raise RuntimeError(f"B2 presign failed for '{key}': {e}") from e
+    with _presign_lock:
+        if len(_presign_cache) > _PRESIGN_CACHE_MAX:
+            _presign_cache.clear()
+        _presign_cache[cache_key] = (time.monotonic(), url)
+    return url
 
 
 def get_upload_stats() -> dict:

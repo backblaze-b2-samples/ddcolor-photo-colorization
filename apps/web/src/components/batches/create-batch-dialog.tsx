@@ -74,37 +74,46 @@ const schema = z
 
 type Values = z.infer<typeof schema>;
 
-function defaults(presetKeys: string[]): Values {
+function defaults(presetKeys: string[], preset: BatchPreset = {}): Values {
   return {
-    name: "",
+    name: preset.name ?? "",
     description: "",
     source: presetKeys.length > 0 ? "choose" : "all",
     sourceKeys: presetKeys,
-    model_id: "ddcolor_paper_tiny",
-    input_size: 512,
-    output_format: "jpeg",
-    make_comparisons: true,
+    model_id: preset.model_id ?? "ddcolor_artistic",
+    input_size: preset.input_size ?? 512,
+    output_format: preset.output_format ?? "jpeg",
+    make_comparisons: preset.make_comparisons ?? true,
     run_now: true,
   };
 }
+
+/** Pre-filled settings, e.g. "Colorize again with another model" from a batch. */
+export type BatchPreset = Partial<
+  Pick<Values, "name" | "model_id" | "input_size" | "output_format" | "make_comparisons">
+>;
 
 interface CreateBatchDialogProps {
   trigger: ReactNode;
   /** Pre-select these originals (Photo Library "Colorize selected"). */
   presetKeys?: string[];
+  preset?: BatchPreset;
 }
 
-export function CreateBatchDialog({ trigger, presetKeys = [] }: CreateBatchDialogProps) {
+export function CreateBatchDialog({ trigger, presetKeys = [], preset }: CreateBatchDialogProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const create = useCreateBatch();
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: defaults(presetKeys) });
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: defaults(presetKeys, preset),
+  });
   const source = useWatch({ control: form.control, name: "source" });
   const photos = usePhotos(200, undefined);
 
   // Re-seed whenever the dialog opens, so a fresh Photo Library selection lands.
   useEffect(() => {
-    if (open) form.reset(defaults(presetKeys));
+    if (open) form.reset(defaults(presetKeys, preset));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -274,8 +283,10 @@ export function CreateBatchDialog({ trigger, presetKeys = [] }: CreateBatchDialo
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    Default: DDColor tiny, the fastest on CPU. Weights download from the Hugging
-                    Face Hub on first use.
+                    Default: DDColor artistic. Results vary per photo and no checkpoint wins on
+                    every image: if a result looks flat or sepia, colorize the same photos again
+                    with another model from the batch page. Weights (about 900 MB) download from
+                    the Hugging Face Hub on first use.
                   </FormDescription>
                 </FormItem>
               )}

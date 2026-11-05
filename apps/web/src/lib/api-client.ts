@@ -400,6 +400,12 @@ export async function runBatch(batchId: string) {
   });
 }
 
+export async function cancelBatch(batchId: string) {
+  return apiFetch<Batch>(batchPath(API_CLIENT_ROUTES.batchCancel.path, batchId), {
+    method: API_CLIENT_ROUTES.batchCancel.method.toUpperCase(),
+  });
+}
+
 export async function getManifestDownloadUrl(batchId: string) {
   return apiFetch<FileUrlResponse>(
     batchPath(API_CLIENT_ROUTES.batchManifestDownload.path, batchId),

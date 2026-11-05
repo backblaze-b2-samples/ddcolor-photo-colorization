@@ -71,6 +71,7 @@ def reset_shared_module_state():
     cached_get_s3_client = b2_client.get_s3_client
     cached_get_s3_client.cache_clear()
     b2_client._health_cache = None
+    b2_client._presign_cache.clear()
     with metrics._lock:
         metrics._request_count.clear()
         metrics._request_duration_sum.clear()
@@ -78,6 +79,7 @@ def reset_shared_module_state():
         metrics._upload_errors = 0
     yield
     cached_get_s3_client.cache_clear()
+    b2_client._presign_cache.clear()
 
 
 @pytest.fixture(autouse=True)

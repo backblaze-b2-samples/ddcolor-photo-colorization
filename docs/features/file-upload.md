@@ -48,6 +48,8 @@ Ingest many black-and-white scans from the browser **directly into Backblaze B2*
 
 ## UX States
 - Idle dropzone listing the accepted formats; per-file progress, verifying phase, success with a link onward, error with retry
+- No per-file success toasts: on `/upload` the queue shows each file's status inline (a toast there would cover the "Colorize these N photos" button); when the queue finishes while the user is on another page, one summary toast ("N photos uploaded"). Errors still toast per file
+- After at least one successful upload: a primary "Colorize these N photos" action opens the New colorization batch dialog preselected with exactly the just-uploaded photos
 - Header indicator "Uploading N files" while the queue runs on another page
 
 ## Verification

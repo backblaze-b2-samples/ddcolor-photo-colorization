@@ -1,4 +1,4 @@
-"""Batch lifecycle: create, read, edit, delete and (re-)run.
+"""Batch lifecycle: create, read, edit, delete, cancel and (re-)run.
 
 The configuration (model, input size, output format, comparisons) is immutable
 after creation because it defines what the outputs and the manifest mean. Only
@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from app.config import settings
 from app.repo import batch_store, ddcolor, get_presigned_url
 from app.repo.b2_io import list_prefix
-from app.service import colorize_runner, keys
+from app.service import batch_records, colorize_runner, keys
 from app.types import (
     Batch,
     BatchDetail,
@@ -190,29 +190,58 @@ def delete_batch(batch_id: str) -> DeleteBatchResponse:
 
 
 def run_batch(batch_id: str) -> Batch:
-    """Queue a draft, or re-run a finished/partial/failed/interrupted batch.
+    """Queue a draft, or re-run a finished/partial/failed/interrupted/cancelled batch.
 
-    A re-run overwrites this batch's own outputs and manifest.
+    A `done` batch re-runs every photo. Any other settled batch keeps the photos
+    it already colorized and re-runs only the failed or unfinished ones. A re-run
+    overwrites this batch's own outputs and rewrites its manifest.
     """
     record = _require(batch_id)
     if record.status in ACTIVE_STATUSES:
         raise BatchConflictError("This batch is already queued or running.")
     _require_engine()
+    keep_done = record.status != BatchStatus.done
 
     def reset(rec: BatchRecord) -> None:
         rec.items = [
-            BatchItemRecord(original_key=i.original_key, original_bytes=i.original_bytes)
+            i
+            if keep_done and i.status == ItemStatus.done
+            else BatchItemRecord(original_key=i.original_key, original_bytes=i.original_bytes)
             for i in rec.items
         ]
         rec.status = BatchStatus.queued
-        rec.done_count = rec.failed_count = rec.derived_bytes = 0
         rec.started_at = rec.finished_at = None
-        rec.updated_at = datetime.now(UTC)
+        rec.stage, rec.model_download_bytes = None, None
+        batch_records.recount(rec)
 
     updated = batch_store.mutate(batch_id, reset)
     if updated is None:
         raise BatchNotFoundError("Batch not found")
     colorize_runner.enqueue(batch_id)
+    return to_batch(updated)
+
+
+def cancel_batch(batch_id: str) -> Batch:
+    """Stop a queued or running batch; the worker moves on at its next check.
+
+    Photos already colorized keep their outputs; the rest stay `pending`, and
+    the batch can be re-run or deleted like any settled batch.
+    """
+    record = _require(batch_id)
+    if record.status not in ACTIVE_STATUSES:
+        raise BatchConflictError("Only a queued or running batch can be cancelled.")
+
+    def cancel(rec: BatchRecord) -> None:
+        if rec.status not in ACTIVE_STATUSES:
+            return
+        rec.status = BatchStatus.cancelled
+        rec.stage = None
+        rec.finished_at = datetime.now(UTC)
+        batch_records.recount(rec)
+
+    updated = batch_store.mutate(batch_id, cancel)
+    if updated is None:
+        raise BatchNotFoundError("Batch not found")
     return to_batch(updated)
 
 

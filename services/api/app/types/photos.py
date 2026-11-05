@@ -23,6 +23,9 @@ class Photo(ResponseModel):
     colorized_url: str | None = Field(
         default=None, description="Inline presigned GET for the latest colorized version."
     )
+    colorized_model_id: ModelId | None = Field(
+        default=None, description="Checkpoint that produced the latest colorized version."
+    )
 
 
 class PhotoPage(ResponseModel):

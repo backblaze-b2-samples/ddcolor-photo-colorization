@@ -44,6 +44,19 @@ class BatchStatus(StrEnum):
     partial = "partial"
     failed = "failed"
     interrupted = "interrupted"
+    cancelled = "cancelled"
+
+
+class BatchStage(StrEnum):
+    """The worker's current step: model preparation while queued, then per photo."""
+
+    preparing_model = "preparing_model"
+    downloading_model = "downloading_model"
+    loading_model = "loading_model"
+    reading_photo = "reading_photo"
+    colorizing_photo = "colorizing_photo"
+    saving_result = "saving_result"
+    saving_manifest = "saving_manifest"
 
 
 class ItemStatus(StrEnum):
@@ -89,6 +102,17 @@ class Batch(ResponseModel):
         description="Bytes this batch wrote: colorized outputs, comparisons and its manifest."
     )
     manifest_key: str | None = None
+    stage: BatchStage | None = Field(
+        default=None,
+        description=(
+            "The worker's current step: preparing, downloading or loading the model while "
+            "queued; reading, colorizing or saving the running photo; writing the manifest. "
+            "Cleared once the batch settles."
+        ),
+    )
+    model_download_bytes: int | None = Field(
+        default=None, description="Model weight bytes in the local cache so far, while downloading."
+    )
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None = None
@@ -142,7 +166,7 @@ class CreateBatchRequest(BaseModel):
     all_unprocessed: bool = Field(
         default=False, description="Use every original that no batch has colorized yet."
     )
-    model_id: ModelId = ModelId.ddcolor_paper_tiny
+    model_id: ModelId = ModelId.ddcolor_artistic
     input_size: InputSize = InputSize.s512
     output_format: OutputFormat = OutputFormat.jpeg
     make_comparisons: bool = True

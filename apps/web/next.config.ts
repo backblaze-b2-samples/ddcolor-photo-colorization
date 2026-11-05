@@ -8,6 +8,10 @@ import type { NextConfig } from "next";
 // without per-deployment tweaks.
 const nextConfig: NextConfig = {
   transpilePackages: ["@ddcolor-photo-colorization/shared"],
+  // `next dev` serves its dev resources (HMR, client chunks) only to
+  // `localhost` by default; a page opened at http://127.0.0.1:3000 (the URL
+  // `pnpm wait-ready` prints) is then blocked and never hydrates.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   images: {
     remotePatterns: [
       {
