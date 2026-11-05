@@ -18,7 +18,7 @@ timm>=1.0,<1.1
 # Hold opencv to 4.x (5.x changes the numpy ABI floor).
 opencv-python-headless>=4.10,<4.12
 numpy>=1.26,<2.3
-huggingface_hub>=0.25,<1.0
+huggingface_hub>=2.4.0,<3.0
 # Needed by the --no-build-isolation DDColor build (a 3.12 venv ships no setuptools).
 setuptools>=70
 wheel>=0.43
