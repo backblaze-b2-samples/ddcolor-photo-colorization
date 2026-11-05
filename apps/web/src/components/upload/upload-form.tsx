@@ -46,38 +46,41 @@ export function UploadForm() {
           disabled={uploading}
         />
         {summary && (
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium">Upload queue</p>
-            <p className="text-xs text-muted-foreground" aria-live="polite">
-              {summary}
-            </p>
-          </div>
-        )}
-        <UploadProgress disabled={uploading} items={items} onRetry={retry} />
-        {hasCompleted && !uploading && (
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              aria-label="Clear completed and failed uploads"
-              variant="outline"
-              size="sm"
-              onClick={clearCompleted}
-            >
-              Clear finished
-            </Button>
-            {uploadedKeys.length > 0 && (
-              <CreateBatchDialog
-                presetKeys={uploadedKeys}
-                trigger={
-                  <Button size="sm">
-                    {uploadedKeys.length === 1
-                      ? "Colorize this photo"
-                      : `Colorize these ${uploadedKeys.length} photos`}
-                  </Button>
-                }
-              />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">Upload queue</p>
+              <p className="text-xs text-muted-foreground" aria-live="polite">
+                {summary}
+              </p>
+            </div>
+            {/* Above the list, so the next step never moves as the queue grows. */}
+            {hasCompleted && !uploading && (
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+                <Button
+                  aria-label="Clear completed and failed uploads"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearCompleted}
+                >
+                  Clear finished
+                </Button>
+                {uploadedKeys.length > 0 && (
+                  <CreateBatchDialog
+                    presetKeys={uploadedKeys}
+                    trigger={
+                      <Button size="sm">
+                        {uploadedKeys.length === 1
+                          ? "Colorize this photo"
+                          : `Colorize these ${uploadedKeys.length} photos`}
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
             )}
           </div>
         )}
+        <UploadProgress disabled={uploading} items={items} onRetry={retry} />
       </CardContent>
     </Card>
   );

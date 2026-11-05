@@ -93,3 +93,11 @@ Known tech debt items. Agents update this when they discover or create tech debt
 - Batches list: default name "DDColor artistic, 2026-11-05" repeats across rows → rows indistinguishable by name (A/v3-14-batches-list-after.png)
 - Photo Library: tile leads with the latest (near-grayscale-flagged) paper version without any warning → library shows the weaker output unflagged (C/v3-06-library.png)
 - Any page at 127.0.0.1:3000: "Can't reach the API" though API is up; dev CORS allows only localhost → misleading error for the 127.0.0.1 origin (A/v2-00-loopback-origin.png)
+
+## 2026-11-05 — verify
+- Dashboard `/`: "Batches" is the filled primary header button while "Ingest photos" (the real first step) is outline-styled → primary-action hierarchy points away from the first step (.local/verify/A-1105r2/10-landing.png)
+- Dashboard on `http://127.0.0.1:3000`: "Can't reach the API ... Retry" banner although the API is up; API CORS only allows the `localhost` origin → misleading error with a Retry that cannot succeed; allow both loopback origins or name the origin problem (.local/verify/A-1105/01-landing.png)
+- Batch detail for an unknown id: "Batch not found" with only a "Retry" primary action → Retry cannot help; make "Back to batches" the primary action (.local/verify/B-1105/01-bad-batch-id.png)
+- Batch from "Colorize again with another model": auto-name "DDColor artistic, <date> (DDColor ModelScope)" keeps the parent model name → title leads with the wrong model; derive the suggested name from the newly chosen model (.local/verify/C-1105r2/06-batch-final.png)
+- New batch dialog: helper text "Default: every ingested original that no batch has colorized yet." shown while "Choose photos" is selected → helper describes the unselected option (.local/verify/A-1105r1/16-new-batch-dialog.png)
+- Bulk Ingest after upload: colorization needs one manual hand-off (button, dialog, Create batch) and the intro copy points to Photo Library/Batches rather than the in-page button → mention the post-upload action in the intro copy (.local/verify/A-1105r2/15-upload-complete.png)
