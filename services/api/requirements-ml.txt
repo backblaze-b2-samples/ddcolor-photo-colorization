@@ -23,5 +23,5 @@ huggingface_hub>=0.25,<1.0
 setuptools>=70
 wheel>=0.43
 # Imported at module load by DDColor's vendored basicsr package.
-pyyaml>=6.0
+pyyaml>=6.0.3
 tqdm>=4.66
