@@ -174,5 +174,36 @@
     "org": "backblaze-b2-samples",
     "name": "ddcolor-photo-colorization"
   },
-  "screenshots": []
+  "screenshots": [
+    {
+      "path": "docs/images/dashboard.png",
+      "alt": "Dashboard with write amplification, photo counts, a bytes-in-B2 chart and recent batches",
+      "caption": "**Dashboard** — write amplification, photos ingested and colorized, batches run, a bytes-in-B2 chart of originals versus derived outputs, and recent batches."
+    },
+    {
+      "path": "docs/images/batches.png",
+      "alt": "Batches list showing completed DDColor colorization runs",
+      "caption": "**Batches** — every colorization run with its status, photo count, DDColor model and input size, derived bytes and creation time."
+    },
+    {
+      "path": "docs/images/batch-detail.png",
+      "alt": "Batch detail with progress, run settings and before/after comparison cards",
+      "caption": "**Batch detail** — one run's progress, model version, output format and byte totals, with a before/after slider for each colorized photo and a Manifest CSV download."
+    },
+    {
+      "path": "docs/images/photo-library.png",
+      "alt": "Photo Library grid of colorized historical photos",
+      "caption": "**Photo Library** — the grayscale originals under `colorization/grayscale/`, each tile showing its latest colorized version and how many versions exist."
+    },
+    {
+      "path": "docs/images/photo-detail.png",
+      "alt": "Photo detail sheet comparing a colorized version with the grayscale original",
+      "caption": "**Photo detail** — a before/after view of one original against any of its colorized versions, each downloadable from B2."
+    },
+    {
+      "path": "docs/images/bulk-ingest.png",
+      "alt": "Bulk Ingest drop zone for black-and-white scans",
+      "caption": "**Bulk Ingest** — drag-and-drop black-and-white scans straight to the B2 grayscale prefix by presigned PUT."
+    }
+  ]
 }
