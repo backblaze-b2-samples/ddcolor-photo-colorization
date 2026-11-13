@@ -47,6 +47,8 @@ jobs:
           node-version: 22
 
       - name: Agent instruction health check
+        env:
+          pnpm_config_verify_deps_before_run: "false"
         run: pnpm check:agent-docs
 
   verify-api:
